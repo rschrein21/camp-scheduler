@@ -1,0 +1,131 @@
+{
+  "updated": "2026-05-21T22:14:35Z",
+  "camps": {
+    "July 6\u201310 \u00b7 Lower Woodland": {
+      "am": 7,
+      "pm": 7,
+      "fullDay": 63,
+      "halfDay": 5,
+      "total": 68
+    },
+    "Aug 10\u201314 \u00b7 Lower Woodland": {
+      "am": 6,
+      "pm": 6,
+      "fullDay": 55,
+      "halfDay": 3,
+      "total": 58
+    },
+    "June 15\u201319 \u00b7 Seattle University": {
+      "am": 9,
+      "pm": 8,
+      "fullDay": 74,
+      "halfDay": 14,
+      "total": 88
+    },
+    "June 22\u201326 \u00b7 Seattle University": {
+      "am": 7,
+      "pm": 6,
+      "fullDay": 58,
+      "halfDay": 6,
+      "total": 64
+    },
+    "July 6\u201310 \u00b7 Seattle University": {
+      "am": 4,
+      "pm": 3,
+      "fullDay": 29,
+      "halfDay": 3,
+      "total": 32
+    },
+    "July 13\u201317 \u00b7 Seattle University": {
+      "am": 4,
+      "pm": 3,
+      "fullDay": 29,
+      "halfDay": 11,
+      "total": 40
+    },
+    "July 20\u201324 \u00b7 Seattle University": {
+      "am": 5,
+      "pm": 4,
+      "fullDay": 39,
+      "halfDay": 3,
+      "total": 42
+    },
+    "Aug 3\u20137 \u00b7 Washington Park": {
+      "am": 8,
+      "pm": 5,
+      "fullDay": 47,
+      "halfDay": 31,
+      "total": 78
+    },
+    "July 20\u201324 \u00b7 Bothell": {
+      "am": 4,
+      "pm": 3,
+      "fullDay": 29,
+      "halfDay": 5,
+      "total": 34
+    },
+    "July 13\u201317 \u00b7 Issaquah": {
+      "am": 4,
+      "pm": 4,
+      "fullDay": 39,
+      "halfDay": 1,
+      "total": 40
+    },
+    "Aug 10\u201314 \u00b7 Issaquah": {
+      "am": 2,
+      "pm": 2,
+      "fullDay": 18,
+      "halfDay": 2,
+      "total": 20
+    },
+    "July 6\u201310 \u00b7 Kirkland": {
+      "am": 3,
+      "pm": 3,
+      "fullDay": 21,
+      "halfDay": 4,
+      "total": 25
+    },
+    "Aug 3\u20137 \u00b7 Bellevue": {
+      "am": 2,
+      "pm": 1,
+      "fullDay": 9,
+      "halfDay": 6,
+      "total": 15
+    },
+    "Aug 17\u201321 \u00b7 Bellevue": {
+      "am": 2,
+      "pm": 1,
+      "fullDay": 9,
+      "halfDay": 5,
+      "total": 14
+    },
+    "June 22\u201326 \u00b7 West Seattle Del Ridge": {
+      "am": 11,
+      "pm": 9,
+      "fullDay": 87,
+      "halfDay": 15,
+      "total": 102
+    },
+    "July 13\u201317 \u00b7 West Seattle Hiawatha": {
+      "am": 9,
+      "pm": 8,
+      "fullDay": 73,
+      "halfDay": 11,
+      "total": 84
+    },
+    "July 20\u201324 \u00b7 West Seattle Del Ridge": {
+      "am": 2,
+      "pm": 2,
+      "fullDay": 15,
+      "halfDay": 4,
+      "total": 19
+    },
+    "Aug 17\u201321 \u00b7 West Seattle Del Ridge": {
+      "am": 9,
+      "pm": 8,
+      "fullDay": 74,
+      "halfDay": 16,
+      "total": 90
+    }
+  }
+}

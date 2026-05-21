@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Camp Scheduler</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f0f2; color: #222; }
+  header { background: #111; color: #fff; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 1rem; font-weight: 700; }
+  .logout-btn { background: #333; color: #fff; border: none; padding: 6px 13px; border-radius: 5px; cursor: pointer; font-size: 0.82rem; }
+
+  /* Login */
+  #loginScreen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .login-card { background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); width: 300px; }
+  .login-card h2 { margin-bottom: 18px; font-size: 1.1rem; }
+  .login-card input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; margin-bottom: 12px; }
+  .login-btn { width: 100%; background: #111; color: #fff; border: none; padding: 12px; border-radius: 6px; font-size: 1rem; font-weight: 700; cursor: pointer; }
+  .error-msg { color: #cc0000; font-size: 0.83rem; margin-top: 8px; display: none; }
+
+  /* Dashboard */
+  #dashboard { display: none; }
+  .tabs { background: #fff; border-bottom: 1px solid #ddd; display: flex; padding: 0 20px; position: sticky; top: 0; z-index: 10; }
+  .tab { padding: 13px 18px; cursor: pointer; font-size: 0.88rem; font-weight: 600; color: #999; border-bottom: 3px solid transparent; }
+  .tab.active { color: #0066cc; border-color: #0066cc; }
+  .content { max-width: 1100px; margin: 0 auto; padding: 20px 14px 60px; }
+
+  /* Camp view */
+  .camp-section { background: #fff; border-radius: 10px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .camp-hdr { padding: 12px 16px; background: #f8f8f8; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .camp-hdr h3 { font-size: 0.92rem; font-weight: 700; }
+  .need-badge { font-size: 0.78rem; color: #888; }
+  .conf-count { font-size: 0.82rem; font-weight: 700; }
+  .conf-ok { color: #1a7a3a; } .conf-short { color: #c05c00; }
+  .need-split { display:flex; gap:10px; align-items:center; font-size:0.78rem; }
+  .need-am { background:#fef3c7; color:#92400e; border-radius:6px; padding:2px 7px; font-weight:700; }
+  .need-pm { background:#ede9fe; color:#5b21b6; border-radius:6px; padding:2px 7px; font-weight:700; }
+
+  table.sched { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  table.sched th { background: #f8f8f8; padding: 7px 10px; text-align: center; font-size: 0.73rem; color: #888; font-weight: 600; border-bottom: 1px solid #eee; }
+  table.sched th.name-col { text-align: left; width: 200px; }
+  table.sched td { padding: 8px 10px; border-bottom: 1px solid #f5f5f5; text-align: center; vertical-align: middle; }
+  table.sched td.name-col { text-align: left; }
+  table.sched tr:last-child td { border-bottom: none; }
+
+  .day-badge { display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 3px 7px; border-radius: 10px; }
+  .db-full { background: #dbeafe; color: #1d4ed8; }
+  .db-am   { background: #fef3c7; color: #92400e; }
+  .db-pm   { background: #ede9fe; color: #5b21b6; }
+  .db-none { color: #ccc; font-size: 0.7rem; }
+
+  .status-select { padding: 5px 7px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.8rem; cursor: pointer; }
+  .status-pending   { background: #fff; }
+  .status-confirmed { background: #e8ffee; color: #1a7a3a; border-color: #7ed8a0; }
+  .status-declined  { background: #fff0f0; color: #aa0000; border-color: #ffb3b3; }
+
+  .rating-stars { color: #f0a500; font-size: 0.85rem; }
+  .role-badge { display:inline-block; background:#111; color:#fff; border-radius:8px; padding:2px 7px; font-size:0.72rem; font-weight:700; }
+
+  /* Staff view */
+  .staff-card { background:#fff; border-radius:10px; margin-bottom:12px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+  .staff-hdr { padding:13px 16px; display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+  .staff-name { font-size:0.92rem; font-weight:700; margin-bottom:3px; }
+  .staff-meta { font-size:0.78rem; color:#888; }
+  .score-pill { background:#111; color:#fff; border-radius:10px; padding:3px 9px; font-size:0.75rem; font-weight:700; }
+  .week-pill  { background:#f0f0f0; color:#555; border-radius:10px; padding:3px 8px; font-size:0.75rem; font-weight:600; }
+  .star-btn { background:none; border:none; font-size:1.05rem; cursor:pointer; padding:0 1px; line-height:1; }
+
+  .camp-rows { padding: 0 16px 12px; }
+  .camp-row  { margin-bottom: 8px; }
+  .camp-row-name { font-size: 0.78rem; font-weight: 700; color: #555; margin-bottom: 4px; }
+  .day-pills { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .dp { font-size: 0.72rem; font-weight: 600; padding: 3px 7px; border-radius: 10px; }
+  .dp-full { background:#dbeafe; color:#1d4ed8; } .dp-am { background:#fef3c7; color:#92400e; } .dp-pm { background:#ede9fe; color:#5b21b6; }
+
+  .notes-area { width:100%; padding:7px 10px; border:1px solid #ddd; border-radius:6px; font-size:0.82rem; resize:none; height:48px; margin: 0 0 6px; }
+  .save-btn { padding:5px 12px; background:#0066cc; color:#fff; border:none; border-radius:5px; font-size:0.78rem; cursor:pointer; }
+
+  .sort-bar { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .sort-bar label { font-size:0.8rem; color:#888; font-weight:600; }
+  .sort-bar select { padding:6px 10px; border:1px solid #ddd; border-radius:6px; font-size:0.83rem; }
+  .empty { text-align:center; color:#bbb; padding:32px; font-size:0.88rem; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <h2>⚽ Admin Login</h2>
+    <input type="password" id="pw" placeholder="Password" onkeydown="if(event.key==='Enter')login()">
+    <button class="login-btn" onclick="login()">Log In</button>
+    <div class="error-msg" id="loginErr">Wrong password</div>
+  </div>
+</div>
+
+<div id="dashboard">
+  <header>
+    <h1>⚽ Nike Camp Scheduler — Admin</h1>
+    <button class="logout-btn" onclick="logout()">Log Out</button>
+  </header>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('camps')">By Camp</div>
+    <div class="tab" onclick="switchTab('staff')">By Staff</div>
+  </div>
+  <div class="content">
+    <div id="campsView"></div>
+    <div id="staffView" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+// Staff needs auto-updated from USSC enrollment (1 staff per 10 campers)
+// AM = all campers; PM = Full Day campers only
+const CAMP_NEEDS = {
+  "Aug 10\u201314 \u00b7 Issaquah": {am:2, pm:2},  // 20 AM / 18 PM campers
+  "Aug 10\u201314 \u00b7 Lower Woodland": {am:6, pm:6},  // 58 AM / 55 PM campers
+  "Aug 17\u201321 \u00b7 Bellevue": {am:2, pm:1},  // 14 AM / 9 PM campers
+  "Aug 17\u201321 \u00b7 West Seattle Del Ridge": {am:9, pm:8},  // 90 AM / 74 PM campers
+  "Aug 3\u20137 \u00b7 Bellevue": {am:2, pm:1},  // 15 AM / 9 PM campers
+  "Aug 3\u20137 \u00b7 Washington Park": {am:8, pm:5},  // 78 AM / 47 PM campers
+  "July 13\u201317 \u00b7 Issaquah": {am:4, pm:4},  // 40 AM / 39 PM campers
+  "July 13\u201317 \u00b7 Seattle University": {am:4, pm:3},  // 40 AM / 29 PM campers
+  "July 13\u201317 \u00b7 West Seattle Hiawatha": {am:9, pm:8},  // 84 AM / 73 PM campers
+  "July 20\u201324 \u00b7 Bothell": {am:4, pm:3},  // 34 AM / 29 PM campers
+  "July 20\u201324 \u00b7 Seattle University": {am:5, pm:4},  // 42 AM / 39 PM campers
+  "July 20\u201324 \u00b7 West Seattle Del Ridge": {am:2, pm:2},  // 19 AM / 15 PM campers
+  "July 6\u201310 \u00b7 Kirkland": {am:3, pm:3},  // 25 AM / 21 PM campers
+  "July 6\u201310 \u00b7 Lower Woodland": {am:7, pm:7},  // 68 AM / 63 PM campers
+  "July 6\u201310 \u00b7 Seattle University": {am:4, pm:3},  // 32 AM / 29 PM campers
+  "June 15\u201319 \u00b7 Seattle University": {am:9, pm:8},  // 88 AM / 74 PM campers
+  "June 22\u201326 \u00b7 Seattle University": {am:7, pm:6},  // 64 AM / 58 PM campers
+  "June 22\u201326 \u00b7 West Seattle Del Ridge": {am:11, pm:9},  // 102 AM / 87 PM campers
+};
+
+let data = { staff: [], camps: [] };
+
+async function login() {
+  const pw = document.getElementById('pw').value;
+  const r = await fetch('/api/admin/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password:pw}) });
+  if (r.ok) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    load();
+  } else {
+    document.getElementById('loginErr').style.display = 'block';
+  }
+}
+async function logout() { await fetch('/api/admin/logout', {method:'POST'}); location.reload(); }
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='camps')||(i===1&&tab==='staff')));
+  document.getElementById('campsView').style.display = tab==='camps' ? '' : 'none';
+  document.getElementById('staffView').style.display = tab==='staff' ? '' : 'none';
+}
+
+async function load() {
+  const [sr, cr] = await Promise.all([fetch('/api/admin/submissions'), fetch('/api/admin/camps')]);
+  data.staff = await sr.json();
+  data.camps = await cr.json();
+  renderCamps(); renderStaff();
+}
+
+function dayBadge(shift) {
+  if (!shift) return `<span class="day-badge db-none">—</span>`;
+  if (shift === 'full') return `<span class="day-badge db-full">Full</span>`;
+  if (shift === 'am')   return `<span class="day-badge db-am">AM</span>`;
+  return `<span class="day-badge db-pm">PM</span>`;
+}
+
+function starsHtml(staffId, cur) {
+  return [1,2,3,4,5].map(i => `<button class="star-btn" onclick="setRating(${staffId},${i})">${i<=cur?'★':'☆'}</button>`).join('');
+}
+
+function renderCamps() {
+  // Group by camp then by staff
+  const campMap = {};
+  data.camps.forEach(row => {
+    if (!campMap[row.camp]) campMap[row.camp] = {};
+    const key = row.staff_id;
+    if (!campMap[row.camp][key]) campMap[row.camp][key] = { name: row.name, email: row.email, preferred_role: row.preferred_role, rating: row.rating, staff_id: row.staff_id, days: {}, status: row.status };
+    campMap[row.camp][key].days[row.day] = row.shift;
+    // Use confirmed if any day confirmed
+    if (row.status === 'confirmed') campMap[row.camp][key].status = 'confirmed';
+  });
+
+  const campOrder = Object.keys(CAMP_NEEDS);
+  let html = '';
+  campOrder.forEach(campName => {
+    const staffMap = campMap[campName] || {};
+    const staffArr = Object.values(staffMap);
+    const need = CAMP_NEEDS[campName] || {am:0, pm:0};
+    const confirmed = staffArr.filter(s => s.status === 'confirmed').length;
+    const confirmedAM = staffArr.filter(s => s.status === 'confirmed' && (Object.values(s.days).includes('am') || Object.values(s.days).includes('full'))).length;
+    const confirmedPM = staffArr.filter(s => s.status === 'confirmed' && Object.values(s.days).includes('full')).length;
+    const amOk = confirmedAM >= need.am;
+    const pmOk = confirmedPM >= need.pm;
+
+    html += `<div class="camp-section">
+      <div class="camp-hdr">
+        <h3>${campName}</h3>
+        <div class="need-split">
+          <span class="need-am">AM need: ${need.am}</span>
+          <span class="need-pm">PM need: ${need.pm}</span>
+          <span class="conf-count ${amOk ? 'conf-ok' : 'conf-short'}">Confirmed: ${confirmed}</span>
+        </div>
+      </div>`;
+
+    if (staffArr.length === 0) {
+      html += `<div class="empty">No requests yet</div>`;
+    } else {
+      html += `<table class="sched">
+        <thead><tr>
+          <th class="name-col">Staff</th>
+          <th>Age Pref</th>
+          <th>Rating</th>
+          ${DAYS.map(d => `<th>${d}</th>`).join('')}
+          <th>Status</th>
+        </tr></thead><tbody>`;
+      staffArr.forEach(s => {
+        const status = s.status || 'pending';
+        html += `<tr>
+          <td class="name-col">
+            <strong>${s.name}</strong><br>
+            <span style="font-size:0.73rem;color:#aaa">${s.email}</span>
+          </td>
+          <td><span class="role-badge">${s.preferred_role || '?'}</span></td>
+          <td><span class="rating-stars">${'★'.repeat(s.rating)}${'☆'.repeat(5-s.rating)}</span></td>
+          ${DAYS.map(d => `<td>${dayBadge(s.days[d])}</td>`).join('')}
+          <td>
+            <select class="status-select status-${status}" onchange="updateStatus(${s.staff_id}, '${campName}', this)">
+              <option value="pending"   ${status==='pending'  ?'selected':''}>Pending</option>
+              <option value="confirmed" ${status==='confirmed'?'selected':''}>✅ Confirmed</option>
+              <option value="declined"  ${status==='declined' ?'selected':''}>❌ Declined</option>
+            </select>
+          </td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+    }
+    html += `</div>`;
+  });
+  document.getElementById('campsView').innerHTML = html || '<div class="empty">No submissions yet.</div>';
+}
+
+function renderStaff(sortBy = 'priority') {
+  let staff = [...data.staff];
+  if (sortBy === 'priority') staff.sort((a,b) => b.priorityScore - a.priorityScore);
+  else if (sortBy === 'name')   staff.sort((a,b) => a.name.localeCompare(b.name));
+  else if (sortBy === 'rating') staff.sort((a,b) => (b.rating?.rating||3)-(a.rating?.rating||3));
+  else if (sortBy === 'weeks')  staff.sort((a,b) => b.weekCount - a.weekCount);
+
+  let html = `<div class="sort-bar">
+    <label>Sort by:</label>
+    <select onchange="renderStaff(this.value)">
+      <option value="priority" ${sortBy==='priority'?'selected':''}>Priority Score</option>
+      <option value="rating"   ${sortBy==='rating'  ?'selected':''}>Rating</option>
+      <option value="weeks"    ${sortBy==='weeks'   ?'selected':''}>Weeks Available</option>
+      <option value="name"     ${sortBy==='name'    ?'selected':''}>Name</option>
+    </select>
+  </div>`;
+
+  if (!staff.length) { html += '<div class="empty">No submissions yet.</div>'; }
+
+  staff.forEach(s => {
+    const rating = s.rating?.rating || 3;
+    const fullDays = s.requests.filter(r => r.shift === 'full').length;
+
+    // Group requests by camp
+    const campMap = {};
+    s.requests.forEach(r => {
+      if (!campMap[r.camp]) campMap[r.camp] = {};
+      campMap[r.camp][r.day] = r.shift;
+    });
+
+    html += `<div class="staff-card">
+      <div class="staff-hdr">
+        <div>
+          <div class="staff-name">${s.name} <span class="role-badge">${s.preferred_role||'?'}</span></div>
+          <div class="staff-meta">${s.email} · ${s.phone||'no phone'}</div>
+          <div class="staff-meta" style="margin-top:3px">Submitted: ${new Date(s.submitted_at).toLocaleDateString()}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:7px">
+          <div style="display:flex;gap:6px;align-items:center">
+            <span class="score-pill">Score: ${s.priorityScore}</span>
+            <span class="week-pill">${s.weekCount} week${s.weekCount!==1?'s':''}</span>
+            <span class="week-pill">${fullDays} full day${fullDays!==1?'s':''}</span>
+          </div>
+          <div id="stars-${s.id}">${starsHtml(s.id, rating)}</div>
+        </div>
+      </div>
+      <div style="padding:0 16px 8px">
+        <textarea class="notes-area" id="notes-${s.id}" placeholder="Notes...">${s.rating?.notes||''}</textarea>
+        <button class="save-btn" onclick="saveNote(${s.id})">Save Note</button>
+      </div>
+      <div class="camp-rows">`;
+
+    Object.keys(campMap).forEach(campName => {
+      const days = campMap[campName];
+      html += `<div class="camp-row">
+        <div class="camp-row-name">${campName}</div>
+        <div class="day-pills">
+          ${DAYS.map(d => {
+            const sh = days[d];
+            if (!sh) return '';
+            return `<span class="dp dp-${sh}"><strong>${d}:</strong> ${sh==='full'?'Full':sh.toUpperCase()}</span>`;
+          }).join('')}
+        </div>
+      </div>`;
+    });
+
+    if (!Object.keys(campMap).length) html += `<span style="font-size:0.8rem;color:#ccc">No camps selected</span>`;
+    html += `</div></div>`;
+  });
+
+  document.getElementById('staffView').innerHTML = html;
+}
+
+async function updateStatus(staffId, camp, select) {
+  select.className = `status-select status-${select.value}`;
+  await fetch('/api/admin/status', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ staff_id: staffId, camp, status: select.value }) });
+  const cr = await fetch('/api/admin/camps');
+  data.camps = await cr.json();
+  renderCamps();
+}
+
+async function setRating(staffId, rating) {
+  const notes = document.getElementById(`notes-${staffId}`)?.value || '';
+  await fetch('/api/admin/rating', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ staff_id: staffId, rating, notes }) });
+  const sr = await fetch('/api/admin/submissions');
+  data.staff = await sr.json();
+  renderStaff();
+}
+
+async function saveNote(staffId) {
+  const notes = document.getElementById(`notes-${staffId}`)?.value || '';
+  const s = data.staff.find(s => s.id === staffId);
+  await fetch('/api/admin/rating', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ staff_id: staffId, rating: s?.rating?.rating || 3, notes }) });
+}
+</script>
+</body>
+</html>

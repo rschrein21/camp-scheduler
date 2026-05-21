@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nike Soccer Camp — Staff Scheduling</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #222; }
+  header { background: #111; color: #fff; padding: 18px 24px; }
+  header h1 { font-size: 1.2rem; font-weight: 700; }
+  header p { font-size: 0.85rem; opacity: 0.55; margin-top: 3px; }
+  .container { max-width: 760px; margin: 28px auto; padding: 0 14px 60px; }
+  .card { background: #fff; border-radius: 10px; padding: 22px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  h2 { font-size: 1rem; font-weight: 700; margin-bottom: 16px; }
+  label.field-label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 4px; color: #555; }
+  input, select { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; margin-bottom: 14px; }
+  input:focus, select:focus { outline: none; border-color: #0066cc; }
+  .notice { background: #e8f4ff; border: 1px solid #b3d7ff; border-radius: 8px; padding: 13px 16px; font-size: 0.85rem; color: #004499; margin-bottom: 20px; line-height: 1.5; }
+
+  /* Week header */
+  .week-header { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: #999; padding: 8px 0 6px; border-bottom: 2px solid #f0f0f0; margin: 22px 0 12px; }
+
+  /* Camp block */
+  .camp-block { border: 1px solid #e8e8e8; border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .camp-top { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px 10px;
+    background: #fafafa; border-bottom: 1px solid #eee; flex-wrap: wrap; gap: 8px; }
+  .camp-name { font-weight: 600; font-size: 0.88rem; color: #222; }
+  .full-week-btn { font-size: 0.78rem; font-weight: 700; padding: 5px 11px; border-radius: 14px;
+    border: 1px solid #0066cc; color: #0066cc; background: #fff; cursor: pointer; white-space: nowrap; }
+  .full-week-btn:hover { background: #0066cc; color: #fff; }
+  .clear-btn { font-size: 0.75rem; padding: 4px 9px; border-radius: 12px; border: 1px solid #ddd; color: #999; background: #fff; cursor: pointer; }
+  .clear-btn:hover { background: #f0f0f0; }
+
+  /* Day grid */
+  .day-grid { display: grid; grid-template-columns: repeat(5, 1fr); border-top: none; }
+  .day-col { border-right: 1px solid #f0f0f0; }
+  .day-col:last-child { border-right: none; }
+  .day-label { text-align: center; font-size: 0.72rem; font-weight: 700; color: #888; padding: 6px 4px 4px;
+    border-bottom: 1px solid #f0f0f0; text-transform: uppercase; }
+  .day-date { text-align: center; font-size: 0.68rem; color: #bbb; margin-bottom: 6px; margin-top: 2px; }
+  .shift-group { display: flex; flex-direction: column; gap: 4px; padding: 6px 6px 10px; align-items: center; }
+  .shift-pill { width: 100%; text-align: center; font-size: 0.72rem; font-weight: 600; padding: 5px 2px;
+    border-radius: 14px; border: 1px solid #e0e0e0; background: #f8f8f8; color: #999; cursor: pointer;
+    transition: all 0.12s; user-select: none; }
+  .shift-pill:hover { background: #eee; color: #555; }
+  .shift-pill.active-full { background: #0066cc; color: #fff; border-color: #0066cc; }
+  .shift-pill.active-am  { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+  .shift-pill.active-pm  { background: #8b5cf6; color: #fff; border-color: #8b5cf6; }
+
+  .submit-btn { width: 100%; background: #111; color: #fff; border: none; padding: 14px;
+    border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 8px; }
+  .submit-btn:hover { background: #333; }
+  .update-bar { background: #f0f7ff; border: 1px solid #c2deff; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; }
+  .update-bar p { font-size: 0.83rem; color: #004499; font-weight: 600; margin-bottom: 10px; }
+  .update-row { display: flex; gap: 8px; }
+  .update-row input { margin-bottom: 0; flex: 1; }
+  .load-btn { white-space: nowrap; padding: 10px 16px; background: #0066cc; color: #fff; border: none;
+    border-radius: 6px; font-size: 0.88rem; font-weight: 700; cursor: pointer; }
+  .load-btn:hover { background: #0055aa; }
+  .load-msg { font-size: 0.8rem; margin-top: 7px; display: none; }
+  .load-ok  { color: #1a7a3a; } .load-err { color: #cc0000; }
+  #successMsg { display: none; background: #e8ffee; border: 1px solid #7ed8a0; border-radius: 8px;
+    padding: 22px; text-align: center; font-size: 1rem; font-weight: 600; color: #1a7a3a; margin-top: 20px; }
+
+  /* Lookup bar */
+  .lookup-bar { background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; }
+  .lookup-bar p { font-size: 0.83rem; color: #664d03; margin-bottom: 10px; font-weight: 600; }
+  .lookup-row { display: flex; gap: 8px; }
+  .lookup-row input { flex: 1; margin-bottom: 0; }
+  .lookup-btn { white-space: nowrap; padding: 10px 16px; background: #f0a500; color: #fff; border: none;
+    border-radius: 6px; font-size: 0.88rem; font-weight: 700; cursor: pointer; }
+  .lookup-btn:hover { background: #cc8800; }
+  .lookup-msg { font-size: 0.8rem; margin-top: 7px; display: none; }
+  .lookup-ok  { color: #1a7a3a; }
+  .lookup-err { color: #cc0000; }
+  .edit-banner { display: none; background: #e8f4ff; border: 1px solid #b3d7ff; border-radius: 8px;
+    padding: 11px 16px; font-size: 0.83rem; color: #004499; margin-bottom: 14px; }
+
+  @media (max-width: 480px) {
+    .shift-pill { font-size: 0.65rem; padding: 4px 1px; }
+    .day-label { font-size: 0.65rem; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ Nike Soccer Camp — Staff Scheduling</h1>
+  <p>Seattle Soccer ID Camps 2026</p>
+</header>
+
+<div class="container">
+  <div class="card">
+    <div class="notice">
+      Select every camp and day you're available. Use <strong>"Full Week"</strong> as a shortcut to mark all days Full Day.
+      Full days and multi-week availability are prioritized when assigning staff. You'll be contacted to confirm.
+    </div>
+
+    <!-- Lookup / update existing submission -->
+    <div class="lookup-bar">
+      <p>🔄 Already submitted? Load your availability to update it.</p>
+      <div class="lookup-row">
+        <input type="email" id="lookupEmail" placeholder="Enter your email address">
+        <button type="button" class="lookup-btn" onclick="loadExisting()">Load My Availability</button>
+      </div>
+      <div class="lookup-msg lookup-ok" id="lookupOk">✅ Loaded! Make your changes and hit Save below.</div>
+      <div class="lookup-msg lookup-err" id="lookupErr">No submission found for that email.</div>
+    </div>
+
+    <div class="edit-banner" id="editBanner">✏️ Editing availability for <strong id="editName"></strong> (<span id="editEmail"></span>)</div>
+
+    <form id="staffForm">
+      <h2>Your Info</h2>
+      <label class="field-label">Full Name *</label>
+      <input type="text" name="name" required placeholder="Jane Smith">
+      <label class="field-label">Email *</label>
+      <input type="email" name="email" required placeholder="jane@example.com">
+      <label class="field-label">Phone</label>
+      <input type="tel" name="phone" placeholder="(206) 555-0100">
+      <label class="field-label">Preferred Age Group</label>
+      <select name="preferred_role">
+        <option value="5-8">Ages 5–8</option>
+        <option value="9-12">Ages 9–12</option>
+        <option value="Both">Both / No Preference</option>
+      </select>
+
+      <label class="field-label">Unisex T-Shirt Size</label>
+      <select name="shirt_size">
+        <option value="">-- Select --</option>
+        <option value="S">S</option>
+        <option value="M">M</option>
+        <option value="L">L</option>
+        <option value="XL">XL</option>
+      </select>
+
+      <label class="field-label">Unisex Shorts Size</label>
+      <select name="shorts_size">
+        <option value="">-- Select --</option>
+        <option value="S">S</option>
+        <option value="M">M</option>
+        <option value="L">L</option>
+        <option value="XL">XL</option>
+      </select>
+
+      <h2>Camp Availability</h2>
+      <div id="campList"></div>
+
+      <button type="submit" class="submit-btn">Submit My Availability →</button>
+    </form>
+    <div id="successMsg">✅ Submitted! We'll be in touch to confirm your shifts.</div>
+  </div>
+</div>
+
+<script>
+const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+const SHIFTS = ['AM','PM','Full'];
+
+// Each camp: name, week label, and Mon-Fri dates
+const CAMPS = [
+  { week: 'June 15–19', name: 'June 15–19 · Seattle University',  dates: ['6/15','6/16','6/17','6/18','6/19'] },
+  { week: 'June 22–26', name: 'June 22–26 · Seattle University',  dates: ['6/22','6/23','6/24','6/25','6/26'] },
+  { week: 'June 22–26', name: 'June 22–26 · West Seattle Del Ridge',         dates: ['6/22','6/23','6/24','6/25','6/26'] },
+  { week: 'July 6–10',  name: 'July 6–10 · Seattle University',    dates: ['7/6', '7/7', '7/8', '7/9', '7/10'] },
+  { week: 'July 6–10',  name: 'July 6–10 · Lower Woodland',        dates: ['7/6', '7/7', '7/8', '7/9', '7/10'] },
+  { week: 'July 6–10',  name: 'July 6–10 · Kirkland',              dates: ['7/6', '7/7', '7/8', '7/9', '7/10'] },
+  { week: 'July 13–17', name: 'July 13–17 · Seattle University',   dates: ['7/13','7/14','7/15','7/16','7/17'] },
+  { week: 'July 13–17', name: 'July 13–17 · West Seattle Hiawatha',          dates: ['7/13','7/14','7/15','7/16','7/17'] },
+  { week: 'July 13–17', name: 'July 13–17 · Issaquah',             dates: ['7/13','7/14','7/15','7/16','7/17'] },
+  { week: 'July 20–24', name: 'July 20–24 · Seattle University',   dates: ['7/20','7/21','7/22','7/23','7/24'] },
+  { week: 'July 20–24', name: 'July 20–24 · West Seattle Del Ridge',         dates: ['7/20','7/21','7/22','7/23','7/24'] },
+  { week: 'July 20–24', name: 'July 20–24 · Bothell',              dates: ['7/20','7/21','7/22','7/23','7/24'] },
+  { week: 'Aug 3–7',    name: 'Aug 3–7 · Washington Park',         dates: ['8/3', '8/4', '8/5', '8/6', '8/7'] },
+  { week: 'Aug 3–7',    name: 'Aug 3–7 · Bellevue',                dates: ['8/3', '8/4', '8/5', '8/6', '8/7'] },
+  { week: 'Aug 10–14',  name: 'Aug 10–14 · Lower Woodland',        dates: ['8/10','8/11','8/12','8/13','8/14'] },
+  { week: 'Aug 10–14',  name: 'Aug 10–14 · Issaquah',              dates: ['8/10','8/11','8/12','8/13','8/14'] },
+  { week: 'Aug 17–21',  name: 'Aug 17–21 · West Seattle Del Ridge',          dates: ['8/17','8/18','8/19','8/20','8/21'] },
+  { week: 'Aug 17–21',  name: 'Aug 17–21 · Bellevue',              dates: ['8/17','8/18','8/19','8/20','8/21'] },
+];
+
+// State: campIndex -> dayIndex -> shift ('am'|'pm'|'full'|null)
+const state = {};
+CAMPS.forEach((_, ci) => {
+  state[ci] = {};
+  DAYS.forEach((_, di) => { state[ci][di] = null; });
+});
+
+function setShift(ci, di, shift) {
+  state[ci][di] = state[ci][di] === shift ? null : shift;
+  renderCamp(ci);
+}
+
+function setFullWeek(ci) {
+  DAYS.forEach((_, di) => { state[ci][di] = 'full'; });
+  renderCamp(ci);
+}
+
+function clearCamp(ci) {
+  DAYS.forEach((_, di) => { state[ci][di] = null; });
+  renderCamp(ci);
+}
+
+function renderCamp(ci) {
+  const camp = CAMPS[ci];
+  const block = document.getElementById(`camp-${ci}`);
+  if (!block) return;
+  const grid = block.querySelector('.day-grid');
+  grid.innerHTML = DAYS.map((day, di) => {
+    const active = state[ci][di];
+    return `<div class="day-col">
+      <div class="day-label">${day}</div>
+      <div class="day-date">${camp.dates[di]}</div>
+      <div class="shift-group">
+        ${SHIFTS.map(s => {
+          const val = s.toLowerCase();
+          const cls = active === val ? `active-${val}` : '';
+          return `<div class="shift-pill ${cls}" onclick="setShift(${ci},${di},'${val}')">${s}</div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Build DOM
+let currentWeek = '';
+const campList = document.getElementById('campList');
+CAMPS.forEach((camp, ci) => {
+  if (camp.week !== currentWeek) {
+    currentWeek = camp.week;
+    const wh = document.createElement('div');
+    wh.className = 'week-header';
+    wh.textContent = camp.week;
+    campList.appendChild(wh);
+  }
+  const block = document.createElement('div');
+  block.className = 'camp-block';
+  block.id = `camp-${ci}`;
+  block.innerHTML = `
+    <div class="camp-top">
+      <span class="camp-name">${camp.name}</span>
+      <div style="display:flex;gap:6px">
+        <button type="button" class="full-week-btn" onclick="setFullWeek(${ci})">✓ Full Week</button>
+        <button type="button" class="clear-btn" onclick="clearCamp(${ci})">Clear</button>
+      </div>
+    </div>
+    <div class="day-grid"></div>`;
+  campList.appendChild(block);
+  renderCamp(ci);
+});
+
+async function loadExisting() {
+  const email = document.getElementById('lookupEmail').value.trim();
+  if (!email) return;
+  document.getElementById('lookupOk').style.display = 'none';
+  document.getElementById('lookupErr').style.display = 'none';
+
+  const res = await fetch('/api/staff?email=' + encodeURIComponent(email));
+  if (!res.ok) {
+    document.getElementById('lookupErr').style.display = 'block';
+    return;
+  }
+  const { staff, requests } = await res.json();
+
+  // Pre-fill personal info
+  document.querySelector('[name=name]').value  = staff.name || '';
+  document.querySelector('[name=email]').value = staff.email || '';
+  document.querySelector('[name=phone]').value = staff.phone || '';
+  document.querySelector('[name=preferred_role]').value = staff.preferred_role || 'Both';
+
+  // Reset all state then apply saved selections
+  CAMPS.forEach((_, ci) => DAYS.forEach((_, di) => { state[ci][di] = null; }));
+  requests.forEach(r => {
+    const ci = CAMPS.findIndex(c => c.name === r.camp);
+    const di = DAYS.indexOf(r.day);
+    if (ci >= 0 && di >= 0) state[ci][di] = r.shift;
+  });
+  CAMPS.forEach((_, ci) => renderCamp(ci));
+
+  // Show edit banner
+  document.getElementById('editBanner').style.display = 'block';
+  document.getElementById('editName').textContent  = staff.name;
+  document.getElementById('editEmail').textContent = staff.email;
+  document.querySelector('.submit-btn').textContent = 'Save Changes →';
+
+  document.getElementById('lookupOk').style.display = 'block';
+  document.getElementById('lookupEmail').value = '';
+  // Scroll down to form
+  document.getElementById('staffForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function loadPrevious() {
+  const email = document.getElementById('lookupEmail').value.trim();
+  const msgEl = document.getElementById('loadMsg');
+  if (!email) { msgEl.textContent = 'Please enter your email.'; msgEl.className = 'load-msg load-err'; msgEl.style.display = 'block'; return; }
+
+  const res = await fetch(`/api/staff/lookup?email=${encodeURIComponent(email)}`);
+  if (res.status === 404) {
+    msgEl.textContent = 'No submission found for that email.';
+    msgEl.className = 'load-msg load-err'; msgEl.style.display = 'block'; return;
+  }
+  if (!res.ok) { msgEl.textContent = 'Error loading data.'; msgEl.className = 'load-msg load-err'; msgEl.style.display = 'block'; return; }
+
+  const { staff, requests } = await res.json();
+
+  // Fill personal info
+  document.querySelector('[name=name]').value = staff.name || '';
+  document.querySelector('[name=email]').value = staff.email || '';
+  document.querySelector('[name=phone]').value = staff.phone || '';
+  document.querySelector('[name=preferred_role]').value = staff.preferred_role || 'Both';
+  document.querySelector('[name=shirt_size]').value = staff.shirt_size || '';
+  document.querySelector('[name=shorts_size]').value = staff.shorts_size || '';
+
+  // Reset state
+  CAMPS.forEach((_, ci) => DAYS.forEach((_, di) => { state[ci][di] = null; }));
+
+  // Re-apply saved shifts
+  requests.forEach(r => {
+    const ci = CAMPS.findIndex(c => c.name === r.camp);
+    const di = DAYS.indexOf(r.day);
+    if (ci !== -1 && di !== -1) state[ci][di] = r.shift;
+  });
+
+  // Re-render all camps
+  CAMPS.forEach((_, ci) => renderCamp(ci));
+
+  msgEl.textContent = `✅ Loaded! Review your selections below and submit to save changes.`;
+  msgEl.className = 'load-msg load-ok'; msgEl.style.display = 'block';
+  document.getElementById('staffForm').scrollIntoView({ behavior: 'smooth' });
+}
+
+document.getElementById('staffForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const shifts = [];
+  CAMPS.forEach((camp, ci) => {
+    DAYS.forEach((day, di) => {
+      if (state[ci][di]) {
+        shifts.push({ camp: camp.name, day: day, shift: state[ci][di] });
+      }
+    });
+  });
+  const body = {
+    name: fd.get('name'),
+    email: fd.get('email'),
+    phone: fd.get('phone'),
+    preferred_role: fd.get('preferred_role'),
+    shirt_size: fd.get('shirt_size'),
+    shorts_size: fd.get('shorts_size'),
+    shifts
+  };
+  const res = await fetch('/api/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (data.ok) {
+    e.target.style.display = 'none';
+    document.getElementById('successMsg').style.display = 'block';
+  } else {
+    alert('Error: ' + (data.error || 'Unknown error'));
+  }
+});
+</script>
+</body>
+</html>

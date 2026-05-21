@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: camp-scheduler
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: ADMIN_PASSWORD
+        value: nikesoccer2025
+      - key: DATABASE_URL
+        fromDatabase:
+          name: camp-scheduler-db
+          property: connectionString
+
+databases:
+  - name: camp-scheduler-db
+    plan: free
