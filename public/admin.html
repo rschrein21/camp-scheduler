@@ -81,6 +81,7 @@
   .sort-bar label { font-size:0.8rem; color:#888; font-weight:600; }
   .sort-bar select { padding:6px 10px; border:1px solid #ddd; border-radius:6px; font-size:0.83rem; }
   .empty { text-align:center; color:#bbb; padding:32px; font-size:0.88rem; }
+  .directors-section { background:#fff; border-radius:10px; padding:20px; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
 </style>
 </head>
 <body>
@@ -102,10 +103,52 @@
   <div class="tabs">
     <div class="tab active" onclick="switchTab('camps')">By Camp</div>
     <div class="tab" onclick="switchTab('staff')">By Staff</div>
+    <div class="tab" onclick="switchTab('directors')">Directors</div>
   </div>
   <div class="content">
     <div id="campsView"></div>
     <div id="staffView" style="display:none"></div>
+    <div id="directorsView" style="display:none">
+      <div class="directors-section">
+        <h3 style="font-size:0.9rem;font-weight:700;margin-bottom:12px">Add Director</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+          <input id="dirNameInput" type="text" placeholder="Full Name" style="padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem;width:200px">
+          <input id="dirEmailInput" type="email" placeholder="Email (optional)" style="padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem;width:220px">
+          <button onclick="addDirector()" style="padding:8px 16px;background:#111;color:#fff;border:none;border-radius:6px;font-size:0.85rem;font-weight:700;cursor:pointer">Add Director</button>
+        </div>
+        <div id="directorsList"></div>
+
+        <h3 style="font-size:0.9rem;font-weight:700;margin:24px 0 12px">Assign Director to Camp</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:20px">
+          <select id="assignDirSelect" style="padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem">
+            <option value="">Select Director…</option>
+          </select>
+          <select id="assignCampSelect" style="padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem">
+            <option value="">Select Camp…</option>
+            <option>June 15–19 · Seattle University</option>
+            <option>June 22–26 · Seattle University</option>
+            <option>June 22–26 · West Seattle Del Ridge</option>
+            <option>July 6–10 · Seattle University</option>
+            <option>July 6–10 · Lower Woodland</option>
+            <option>July 6–10 · Kirkland</option>
+            <option>July 13–17 · Seattle University</option>
+            <option>July 13–17 · West Seattle Hiawatha</option>
+            <option>July 13–17 · Issaquah</option>
+            <option>July 20–24 · Seattle University</option>
+            <option>July 20–24 · West Seattle Del Ridge</option>
+            <option>July 20–24 · Bothell</option>
+            <option>Aug 3–7 · Washington Park</option>
+            <option>Aug 3–7 · Bellevue</option>
+            <option>Aug 10–14 · Lower Woodland</option>
+            <option>Aug 10–14 · Issaquah</option>
+            <option>Aug 17–21 · West Seattle Del Ridge</option>
+            <option>Aug 17–21 · Bellevue</option>
+          </select>
+          <button onclick="assignDirector()" style="padding:8px 16px;background:#0066cc;color:#fff;border:none;border-radius:6px;font-size:0.85rem;font-weight:700;cursor:pointer">Assign</button>
+        </div>
+        <div id="assignmentsList"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -150,9 +193,13 @@ async function login() {
 async function logout() { await fetch('/api/admin/logout', {method:'POST'}); location.reload(); }
 
 function switchTab(tab) {
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='camps')||(i===1&&tab==='staff')));
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', (['camps','staff','directors'][i]) === tab);
+  });
   document.getElementById('campsView').style.display = tab==='camps' ? '' : 'none';
   document.getElementById('staffView').style.display = tab==='staff' ? '' : 'none';
+  document.getElementById('directorsView').style.display = tab==='directors' ? '' : 'none';
+  if (tab === 'directors') loadDirectors();
 }
 
 async function load() {
@@ -352,6 +399,105 @@ async function setRating(staffId, rating) {
   const sr = await fetch('/api/admin/submissions');
   data.staff = await sr.json();
   renderStaff();
+}
+
+// ── Directors tab ────────────────────────────────────────
+let directorsData = { directors: [], assignments: [] };
+
+async function loadDirectors() {
+  const [dr, ar] = await Promise.all([
+    fetch('/api/admin/directors'),
+    fetch('/api/admin/director-assignments')
+  ]);
+  directorsData.directors = await dr.json();
+  directorsData.assignments = await ar.json();
+  renderDirectors();
+}
+
+function renderDirectors() {
+  const { directors, assignments } = directorsData;
+
+  // Directors list
+  let dHtml = `<table class="sched" style="margin-bottom:8px">
+    <thead><tr><th class="name-col">Name</th><th>Email</th><th style="width:80px">Action</th></tr></thead><tbody>`;
+  if (!directors.length) {
+    dHtml += `<tr><td colspan="3" style="text-align:center;color:#bbb;padding:16px">No directors added yet</td></tr>`;
+  } else {
+    directors.forEach(d => {
+      dHtml += `<tr>
+        <td class="name-col"><strong>${d.name}</strong></td>
+        <td style="font-size:0.8rem;color:#888">${d.email || '—'}</td>
+        <td><button onclick="removeDirector(${d.id})" style="padding:4px 10px;background:#fff0f0;color:#aa0000;border:1px solid #ffb3b3;border-radius:5px;font-size:0.78rem;cursor:pointer">Remove</button></td>
+      </tr>`;
+    });
+  }
+  dHtml += `</tbody></table>`;
+  document.getElementById('directorsList').innerHTML = dHtml;
+
+  // Populate director select
+  const sel = document.getElementById('assignDirSelect');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Select Director…</option>';
+  directors.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id; opt.textContent = d.name;
+    if (String(d.id) === cur) opt.selected = true;
+    sel.appendChild(opt);
+  });
+
+  // Assignments list
+  let aHtml = `<table class="sched">
+    <thead><tr><th>Director</th><th>Camp</th><th style="width:80px">Action</th></tr></thead><tbody>`;
+  if (!assignments.length) {
+    aHtml += `<tr><td colspan="3" style="text-align:center;color:#bbb;padding:16px">No assignments yet</td></tr>`;
+  } else {
+    assignments.forEach(a => {
+      aHtml += `<tr>
+        <td><strong>${a.director_name}</strong></td>
+        <td style="font-size:0.82rem">${a.camp}</td>
+        <td><button onclick="removeAssignment(${a.id})" style="padding:4px 10px;background:#fff0f0;color:#aa0000;border:1px solid #ffb3b3;border-radius:5px;font-size:0.78rem;cursor:pointer">Remove</button></td>
+      </tr>`;
+    });
+  }
+  aHtml += `</tbody></table>`;
+  document.getElementById('assignmentsList').innerHTML = aHtml;
+}
+
+async function addDirector() {
+  const name = document.getElementById('dirNameInput').value.trim();
+  const email = document.getElementById('dirEmailInput').value.trim();
+  if (!name) return alert('Name required');
+  const r = await fetch('/api/admin/directors', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, email })
+  });
+  if (!r.ok) { const e = await r.json(); return alert(e.error || 'Error'); }
+  document.getElementById('dirNameInput').value = '';
+  document.getElementById('dirEmailInput').value = '';
+  await loadDirectors();
+}
+
+async function removeDirector(id) {
+  if (!confirm('Remove this director?')) return;
+  await fetch(`/api/admin/directors/${id}`, { method: 'DELETE' });
+  await loadDirectors();
+}
+
+async function assignDirector() {
+  const director_id = document.getElementById('assignDirSelect').value;
+  const camp = document.getElementById('assignCampSelect').value;
+  if (!director_id || !camp) return alert('Select a director and camp');
+  const r = await fetch('/api/admin/director-assignments', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ director_id: parseInt(director_id), camp })
+  });
+  if (!r.ok) { const e = await r.json(); return alert(e.error || 'Error'); }
+  await loadDirectors();
+}
+
+async function removeAssignment(id) {
+  await fetch(`/api/admin/director-assignments/${id}`, { method: 'DELETE' });
+  await loadDirectors();
 }
 
 async function saveNote(staffId) {

@@ -41,6 +41,37 @@ if (IS_PG) {
         rating INTEGER DEFAULT 3,
         notes TEXT
       );
+      CREATE TABLE IF NOT EXISTS directors (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        email TEXT
+      );
+      CREATE TABLE IF NOT EXISTS director_assignments (
+        id SERIAL PRIMARY KEY,
+        director_id INTEGER NOT NULL REFERENCES directors(id) ON DELETE CASCADE,
+        camp TEXT NOT NULL,
+        UNIQUE(director_id, camp)
+      );
+      CREATE TABLE IF NOT EXISTS hours_worked (
+        id SERIAL PRIMARY KEY,
+        staff_id INTEGER NOT NULL REFERENCES staff(id),
+        camp TEXT NOT NULL,
+        hours NUMERIC(5,2) NOT NULL DEFAULT 0,
+        notes TEXT,
+        director_id INTEGER REFERENCES directors(id),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(staff_id, camp)
+      );
+      CREATE TABLE IF NOT EXISTS weekly_ratings (
+        id SERIAL PRIMARY KEY,
+        staff_id INTEGER NOT NULL REFERENCES staff(id),
+        camp TEXT NOT NULL,
+        director_id INTEGER REFERENCES directors(id),
+        rating INTEGER NOT NULL DEFAULT 3,
+        notes TEXT,
+        rated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(staff_id, camp, director_id)
+      );
     `);
   }};
 } else {
@@ -78,12 +109,42 @@ if (IS_PG) {
       staff_id INTEGER PRIMARY KEY, rating INTEGER DEFAULT 3, notes TEXT,
       FOREIGN KEY (staff_id) REFERENCES staff(id)
     );
+    CREATE TABLE IF NOT EXISTS directors (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      email TEXT
+    );
+    CREATE TABLE IF NOT EXISTS director_assignments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      director_id INTEGER NOT NULL REFERENCES directors(id) ON DELETE CASCADE,
+      camp TEXT NOT NULL,
+      UNIQUE(director_id, camp)
+    );
+    CREATE TABLE IF NOT EXISTS hours_worked (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      staff_id INTEGER NOT NULL REFERENCES staff(id),
+      camp TEXT NOT NULL,
+      hours REAL NOT NULL DEFAULT 0,
+      notes TEXT,
+      director_id INTEGER REFERENCES directors(id),
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(staff_id, camp)
+    );
+    CREATE TABLE IF NOT EXISTS weekly_ratings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      staff_id INTEGER NOT NULL REFERENCES staff(id),
+      camp TEXT NOT NULL,
+      director_id INTEGER REFERENCES directors(id),
+      rating INTEGER NOT NULL DEFAULT 3,
+      notes TEXT,
+      rated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(staff_id, camp, director_id)
+    );
   `);
 
   // Wrap sqlite in async-compatible interface
   query = (sql, params = []) => {
     // Convert $1,$2 placeholders to ? for SQLite
-    let i = 0;
     const converted = sql.replace(/\$\d+/g, () => '?');
     const trimmed = converted.trim().toUpperCase();
     if (trimmed.startsWith('SELECT') || trimmed.startsWith('WITH')) {
@@ -99,7 +160,7 @@ if (IS_PG) {
       }
       return Promise.resolve([{ id: info.lastInsertRowid }]);
     }
-    const info = sqlite.prepare(converted).run(...params);
+    sqlite.prepare(converted).run(...params);
     return Promise.resolve([]);
   };
   db = { init: async () => {} };
@@ -181,26 +242,174 @@ app.post('/api/admin/logout', (req, res) => { req.session.destroy(); res.json({ 
 function requireAdmin(req, res, next) { req.session.admin ? next() : res.status(401).json({ error: 'Unauthorized' }); }
 
 // ── Director Auth ─────────────────────────────────────────
-app.post('/api/director/login', (req, res) => {
-  if (req.body.password === DIRECTOR_PASSWORD) { req.session.director = true; res.json({ ok: true }); }
-  else res.status(401).json({ error: 'Wrong password' });
+app.post('/api/director/login', async (req, res) => {
+  try {
+    const { name, password } = req.body;
+    if (password !== DIRECTOR_PASSWORD) return res.status(401).json({ error: 'Wrong password' });
+    const rows = await query('SELECT * FROM directors WHERE LOWER(name) = LOWER($1)', [name || '']);
+    if (!rows.length) return res.status(404).json({ error: 'Director not found. Ask admin to add you.' });
+    const dir = rows[0];
+    req.session.director = true;
+    req.session.directorId = dir.id;
+    req.session.directorName = dir.name;
+    res.json({ ok: true, director: { id: dir.id, name: dir.name, email: dir.email } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 app.post('/api/director/logout', (req, res) => { req.session.destroy(); res.json({ ok: true }); });
 function requireDirector(req, res, next) { (req.session.admin || req.session.director) ? next() : res.status(401).json({ error: 'Unauthorized' }); }
 
-// Director: confirmed schedule by camp
+// GET /api/director/me
+app.get('/api/director/me', requireDirector, async (req, res) => {
+  try {
+    if (req.session.directorId) {
+      const rows = await query('SELECT * FROM directors WHERE id = $1', [req.session.directorId]);
+      return res.json(rows[0] || { id: req.session.directorId, name: req.session.directorName, email: '' });
+    }
+    if (req.session.admin) {
+      return res.json({ id: 0, name: 'Admin', email: '' });
+    }
+    res.status(401).json({ error: 'Unauthorized' });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Director: confirmed schedule by camp (filtered by assignments for non-admin)
 app.get('/api/director/schedule', requireDirector, async (req, res) => {
   try {
+    if (req.session.admin) {
+      const rows = await query(`
+        SELECT r.camp, r.day, r.shift,
+               s.name, s.email, s.phone, s.preferred_role, s.shirt_size, s.shorts_size, s.id as staff_id
+        FROM requests r
+        JOIN staff s ON r.staff_id = s.id
+        WHERE r.status = 'confirmed'
+        ORDER BY r.camp, s.name, r.day
+      `);
+      return res.json(rows);
+    }
+    // Director: get assigned camps first
+    const assignments = await query('SELECT camp FROM director_assignments WHERE director_id = $1', [req.session.directorId]);
+    if (!assignments.length) return res.json([]);
+    const camps = assignments.map(a => a.camp);
+    const placeholders = camps.map((_, i) => `$${i + 1}`).join(',');
     const rows = await query(`
       SELECT r.camp, r.day, r.shift,
              s.name, s.email, s.phone, s.preferred_role, s.shirt_size, s.shorts_size, s.id as staff_id
       FROM requests r
       JOIN staff s ON r.staff_id = s.id
-      WHERE r.status = 'confirmed'
+      WHERE r.status = 'confirmed' AND r.camp IN (${placeholders})
       ORDER BY r.camp, s.name, r.day
-    `);
+    `, camps);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/director/hours — upsert hours worked
+app.post('/api/director/hours', requireDirector, async (req, res) => {
+  try {
+    const { staff_id, camp, hours, notes } = req.body;
+    const directorId = req.session.directorId || null;
+    if (IS_PG) {
+      await query(`
+        INSERT INTO hours_worked (staff_id, camp, hours, notes, director_id, updated_at)
+        VALUES ($1,$2,$3,$4,$5,NOW())
+        ON CONFLICT (staff_id, camp) DO UPDATE SET hours=EXCLUDED.hours, notes=EXCLUDED.notes, director_id=EXCLUDED.director_id, updated_at=NOW()
+      `, [staff_id, camp, hours, notes || null, directorId]);
+    } else {
+      await query(`
+        INSERT INTO hours_worked (staff_id, camp, hours, notes, director_id)
+        VALUES ($1,$2,$3,$4,$5)
+        ON CONFLICT(staff_id, camp) DO UPDATE SET hours=excluded.hours, notes=excluded.notes, director_id=excluded.director_id
+      `, [staff_id, camp, hours, notes || null, directorId]);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/director/hours
+app.get('/api/director/hours', requireDirector, async (req, res) => {
+  try {
+    if (req.session.admin) {
+      const rows = await query(`
+        SELECT h.staff_id, s.name, h.camp, h.hours, h.notes
+        FROM hours_worked h
+        JOIN staff s ON h.staff_id = s.id
+        ORDER BY h.camp, s.name
+      `);
+      return res.json(rows);
+    }
+    const assignments = await query('SELECT camp FROM director_assignments WHERE director_id = $1', [req.session.directorId]);
+    if (!assignments.length) return res.json([]);
+    const camps = assignments.map(a => a.camp);
+    const placeholders = camps.map((_, i) => `$${i + 1}`).join(',');
+    const rows = await query(`
+      SELECT h.staff_id, s.name, h.camp, h.hours, h.notes
+      FROM hours_worked h
+      JOIN staff s ON h.staff_id = s.id
+      WHERE h.camp IN (${placeholders})
+      ORDER BY h.camp, s.name
+    `, camps);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/director/rate — upsert weekly rating
+app.post('/api/director/rate', requireDirector, async (req, res) => {
+  try {
+    const { staff_id, camp, rating, notes } = req.body;
+    const directorId = req.session.directorId || null;
+    if (IS_PG) {
+      await query(`
+        INSERT INTO weekly_ratings (staff_id, camp, director_id, rating, notes)
+        VALUES ($1,$2,$3,$4,$5)
+        ON CONFLICT (staff_id, camp, director_id) DO UPDATE SET rating=EXCLUDED.rating, notes=EXCLUDED.notes
+      `, [staff_id, camp, directorId, rating, notes || null]);
+    } else {
+      await query(`
+        INSERT INTO weekly_ratings (staff_id, camp, director_id, rating, notes)
+        VALUES ($1,$2,$3,$4,$5)
+        ON CONFLICT(staff_id, camp, director_id) DO UPDATE SET rating=excluded.rating, notes=excluded.notes
+      `, [staff_id, camp, directorId, rating, notes || null]);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/director/ratings
+app.get('/api/director/ratings', requireDirector, async (req, res) => {
+  try {
+    if (req.session.admin) {
+      const rows = await query(`
+        SELECT wr.staff_id, s.name, wr.camp, wr.director_id, wr.rating, wr.notes
+        FROM weekly_ratings wr
+        JOIN staff s ON wr.staff_id = s.id
+        ORDER BY wr.camp, s.name
+      `);
+      return res.json(rows);
+    }
+    const rows = await query(`
+      SELECT wr.staff_id, s.name, wr.camp, wr.director_id, wr.rating, wr.notes
+      FROM weekly_ratings wr
+      JOIN staff s ON wr.staff_id = s.id
+      WHERE wr.director_id = $1
+      ORDER BY wr.camp, s.name
+    `, [req.session.directorId]);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // ── Admin Data ────────────────────────────────────────────
@@ -253,9 +462,78 @@ app.post('/api/admin/rating', requireAdmin, async (req, res) => {
         [staff_id, rating, notes]);
     } else {
       await query(`INSERT INTO staff_ratings (staff_id, rating, notes) VALUES ($1,$2,$3)
-        ON CONFLICT(staff_id) DO UPDATE SET rating=$2, notes=$3`,
+        ON CONFLICT(staff_id) DO UPDATE SET rating=excluded.rating, notes=excluded.notes`,
         [staff_id, rating, notes]);
     }
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── Admin: Director Management ────────────────────────────
+app.get('/api/admin/directors', requireAdmin, async (req, res) => {
+  try {
+    const rows = await query('SELECT * FROM directors ORDER BY name');
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/api/admin/directors', requireAdmin, async (req, res) => {
+  try {
+    const { name, email } = req.body;
+    if (!name) return res.status(400).json({ error: 'Name required' });
+    const rows = await query(
+      'INSERT INTO directors (name, email) VALUES ($1,$2) RETURNING *',
+      [name, email || null]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.delete('/api/admin/directors/:id', requireAdmin, async (req, res) => {
+  try {
+    await query('DELETE FROM directors WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.get('/api/admin/director-assignments', requireAdmin, async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT da.id, da.camp, da.director_id, d.name as director_name
+      FROM director_assignments da
+      JOIN directors d ON da.director_id = d.id
+      ORDER BY da.camp, d.name
+    `);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.post('/api/admin/director-assignments', requireAdmin, async (req, res) => {
+  try {
+    const { director_id, camp } = req.body;
+    if (IS_PG) {
+      await query(`
+        INSERT INTO director_assignments (director_id, camp) VALUES ($1,$2)
+        ON CONFLICT (director_id, camp) DO NOTHING
+      `, [director_id, camp]);
+    } else {
+      await query(`
+        INSERT OR IGNORE INTO director_assignments (director_id, camp) VALUES ($1,$2)
+      `, [director_id, camp]);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.delete('/api/admin/director-assignments/:id', requireAdmin, async (req, res) => {
+  try {
+    await query('DELETE FROM director_assignments WHERE id = $1', [req.params.id]);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
@@ -282,11 +560,6 @@ app.get('/api/staff/schedule', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
-// ── Page routes ──────────────────────────────────────────
-app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
-app.get('/director', (req, res) => res.sendFile(path.join(__dirname, 'public', 'director.html')));
-app.get('/schedule', (req, res) => res.sendFile(path.join(__dirname, 'public', 'schedule.html')));
 
 // ── Start ─────────────────────────────────────────────────
 const PORT = process.env.PORT || 3579;
