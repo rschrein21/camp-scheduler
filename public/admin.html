@@ -185,7 +185,26 @@ function renderCamps() {
     if (row.status === 'confirmed') campMap[row.camp][key].status = 'confirmed';
   });
 
-  const campOrder = Object.keys(CAMP_NEEDS);
+  const campOrder = [
+    'June 15\u201319 \u00b7 Seattle University',
+    'June 22\u201326 \u00b7 Seattle University',
+    'June 22\u201326 \u00b7 West Seattle Del Ridge',
+    'July 6\u201310 \u00b7 Seattle University',
+    'July 6\u201310 \u00b7 Lower Woodland',
+    'July 6\u201310 \u00b7 Kirkland',
+    'July 13\u201317 \u00b7 Seattle University',
+    'July 13\u201317 \u00b7 West Seattle Hiawatha',
+    'July 13\u201317 \u00b7 Issaquah',
+    'July 20\u201324 \u00b7 Seattle University',
+    'July 20\u201324 \u00b7 West Seattle Del Ridge',
+    'July 20\u201324 \u00b7 Bothell',
+    'Aug 3\u20137 \u00b7 Washington Park',
+    'Aug 3\u20137 \u00b7 Bellevue',
+    'Aug 10\u201314 \u00b7 Lower Woodland',
+    'Aug 10\u201314 \u00b7 Issaquah',
+    'Aug 17\u201321 \u00b7 West Seattle Del Ridge',
+    'Aug 17\u201321 \u00b7 Bellevue',
+  ];
   let html = '';
   campOrder.forEach(campName => {
     const staffMap = campMap[campName] || {};
