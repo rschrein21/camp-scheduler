@@ -116,6 +116,11 @@ app.use(session({
 }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Clean URL routes
+app.get('/admin',    (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+app.get('/director', (req, res) => res.sendFile(path.join(__dirname, 'public', 'director.html')));
+app.get('/schedule', (req, res) => res.sendFile(path.join(__dirname, 'public', 'schedule.html')));
+
 // ── Staff Submission ──────────────────────────────────────
 app.post('/api/submit', async (req, res) => {
   try {
@@ -277,6 +282,11 @@ app.get('/api/staff/schedule', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+// ── Page routes ──────────────────────────────────────────
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+app.get('/director', (req, res) => res.sendFile(path.join(__dirname, 'public', 'director.html')));
+app.get('/schedule', (req, res) => res.sendFile(path.join(__dirname, 'public', 'schedule.html')));
 
 // ── Start ─────────────────────────────────────────────────
 const PORT = process.env.PORT || 3579;
