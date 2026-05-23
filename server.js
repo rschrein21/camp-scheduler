@@ -5,6 +5,7 @@ const path = require('path');
 const app = express();
 const IS_PG = !!process.env.DATABASE_URL;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'nikesoccer2025';
+const DIRECTOR_PASSWORD = process.env.DIRECTOR_PASSWORD || 'director2026';
 
 // ── Database setup ────────────────────────────────────────
 let db, query;
@@ -23,6 +24,8 @@ if (IS_PG) {
         preferred_role TEXT,
         shirt_size TEXT,
         shorts_size TEXT,
+        birthdate TEXT,
+        address TEXT,
         submitted_at TIMESTAMPTZ DEFAULT NOW()
       );
       CREATE TABLE IF NOT EXISTS requests (
@@ -52,12 +55,17 @@ if (IS_PG) {
     sqlite.exec('ALTER TABLE staff ADD COLUMN shirt_size TEXT');
     sqlite.exec('ALTER TABLE staff ADD COLUMN shorts_size TEXT');
   }
+  if (staffCols.length > 0 && !staffCols.includes('birthdate')) {
+    sqlite.exec('ALTER TABLE staff ADD COLUMN birthdate TEXT');
+    sqlite.exec('ALTER TABLE staff ADD COLUMN address TEXT');
+  }
 
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS staff (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL, email TEXT NOT NULL, phone TEXT,
       preferred_role TEXT, shirt_size TEXT, shorts_size TEXT,
+      birthdate TEXT, address TEXT,
       submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS requests (
@@ -111,7 +119,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ── Staff Submission ──────────────────────────────────────
 app.post('/api/submit', async (req, res) => {
   try {
-    const { name, email, phone, preferred_role, shirt_size, shorts_size, shifts } = req.body;
+    const { name, email, phone, preferred_role, shirt_size, shorts_size, birthdate, address, shifts } = req.body;
     if (!name || !email) return res.status(400).json({ error: 'Name and email required' });
 
     const existing = await query('SELECT id FROM staff WHERE LOWER(email) = LOWER($1)', [email]);
@@ -120,13 +128,13 @@ app.post('/api/submit', async (req, res) => {
       staffId = existing[0].id;
       await query('DELETE FROM requests WHERE staff_id = $1', [staffId]);
       await query(
-        'UPDATE staff SET name=$1, phone=$2, preferred_role=$3, shirt_size=$4, shorts_size=$5, submitted_at=' + (IS_PG ? 'NOW()' : 'CURRENT_TIMESTAMP') + ' WHERE id=$6',
-        [name, phone, preferred_role, shirt_size, shorts_size, staffId]
+        'UPDATE staff SET name=$1, phone=$2, preferred_role=$3, shirt_size=$4, shorts_size=$5, birthdate=$6, address=$7, submitted_at=' + (IS_PG ? 'NOW()' : 'CURRENT_TIMESTAMP') + ' WHERE id=$8',
+        [name, phone, preferred_role, shirt_size, shorts_size, birthdate, address, staffId]
       );
     } else {
       const rows = await query(
-        'INSERT INTO staff (name, email, phone, preferred_role, shirt_size, shorts_size) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-        [name, email, phone, preferred_role, shirt_size, shorts_size]
+        'INSERT INTO staff (name, email, phone, preferred_role, shirt_size, shorts_size, birthdate, address) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
+        [name, email, phone, preferred_role, shirt_size, shorts_size, birthdate, address]
       );
       staffId = rows[0].id;
     }
@@ -166,6 +174,29 @@ app.post('/api/admin/login', (req, res) => {
 });
 app.post('/api/admin/logout', (req, res) => { req.session.destroy(); res.json({ ok: true }); });
 function requireAdmin(req, res, next) { req.session.admin ? next() : res.status(401).json({ error: 'Unauthorized' }); }
+
+// ── Director Auth ─────────────────────────────────────────
+app.post('/api/director/login', (req, res) => {
+  if (req.body.password === DIRECTOR_PASSWORD) { req.session.director = true; res.json({ ok: true }); }
+  else res.status(401).json({ error: 'Wrong password' });
+});
+app.post('/api/director/logout', (req, res) => { req.session.destroy(); res.json({ ok: true }); });
+function requireDirector(req, res, next) { (req.session.admin || req.session.director) ? next() : res.status(401).json({ error: 'Unauthorized' }); }
+
+// Director: confirmed schedule by camp
+app.get('/api/director/schedule', requireDirector, async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT r.camp, r.day, r.shift,
+             s.name, s.email, s.phone, s.preferred_role, s.shirt_size, s.shorts_size, s.id as staff_id
+      FROM requests r
+      JOIN staff s ON r.staff_id = s.id
+      WHERE r.status = 'confirmed'
+      ORDER BY r.camp, s.name, r.day
+    `);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
 
 // ── Admin Data ────────────────────────────────────────────
 app.get('/api/admin/submissions', requireAdmin, async (req, res) => {
@@ -222,6 +253,29 @@ app.post('/api/admin/rating', requireAdmin, async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── Staff Schedule (confirmed shifts only) ──────────────────
+app.get('/api/staff/schedule', async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+    const rows = await query('SELECT * FROM staff WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const staff = rows[0];
+    const confirmed = await query(
+      "SELECT camp, day, shift FROM requests WHERE staff_id = $1 AND status = 'confirmed' ORDER BY camp, day",
+      [staff.id]
+    );
+    const pending = await query(
+      "SELECT camp, day, shift FROM requests WHERE staff_id = $1 AND status = 'pending' ORDER BY camp, day",
+      [staff.id]
+    );
+    res.json({ name: staff.name, email: staff.email, confirmed, pending });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // ── Start ─────────────────────────────────────────────────

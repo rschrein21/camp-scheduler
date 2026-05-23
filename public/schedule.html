@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Schedule — Nike Soccer Camp</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #222; }
+  header { background: #111; color: #fff; padding: 18px 24px; }
+  header h1 { font-size: 1.2rem; font-weight: 700; }
+  header p { font-size: 0.85rem; opacity: 0.55; margin-top: 3px; }
+  .container { max-width: 700px; margin: 28px auto; padding: 0 14px 60px; }
+  .card { background: #fff; border-radius: 10px; padding: 22px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+
+  .lookup-bar { margin-bottom: 0; }
+  .lookup-bar p { font-size: 0.85rem; color: #555; margin-bottom: 12px; }
+  .lookup-row { display: flex; gap: 8px; }
+  .lookup-row input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; }
+  .lookup-row input:focus { outline: none; border-color: #0066cc; }
+  .lookup-btn { white-space: nowrap; padding: 10px 18px; background: #111; color: #fff; border: none;
+    border-radius: 6px; font-size: 0.9rem; font-weight: 700; cursor: pointer; }
+  .lookup-btn:hover { background: #333; }
+  .lookup-msg { font-size: 0.82rem; margin-top: 8px; display: none; }
+  .msg-ok  { color: #1a7a3a; }
+  .msg-err { color: #cc0000; }
+
+  #results { display: none; }
+
+  .greeting { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+  .subline  { font-size: 0.82rem; color: #888; margin-bottom: 18px; }
+
+  .week-header { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: #999; padding: 8px 0 6px; border-bottom: 2px solid #f0f0f0; margin: 20px 0 12px; }
+  .week-header:first-child { margin-top: 0; }
+
+  .camp-block { border: 1px solid #e8e8e8; border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .camp-name  { font-size: 0.85rem; font-weight: 700; padding: 10px 14px; background: #fafafa;
+    border-bottom: 1px solid #eee; }
+
+  .day-list { padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .day-chip { font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 12px; }
+  .chip-full    { background: #dbeafe; color: #1d4ed8; }
+  .chip-am      { background: #fef3c7; color: #92400e; }
+  .chip-pm      { background: #ede9fe; color: #5b21b6; }
+  .chip-pending { background: #f0f0f0; color: #999; font-weight: 600; font-style: italic; }
+
+  .pending-note { background: #fffbea; border: 1px solid #fcd34d; border-radius: 8px;
+    padding: 12px 16px; font-size: 0.83rem; color: #78350f; margin-top: 18px; }
+
+  .empty-state { text-align: center; padding: 28px; color: #aaa; font-size: 0.88rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ Nike Soccer Camp — My Schedule</h1>
+  <p>Seattle Soccer ID Camps 2026</p>
+</header>
+
+<div class="container">
+  <div class="card">
+    <div class="lookup-bar">
+      <p>Enter your email to see your confirmed shifts.</p>
+      <div class="lookup-row">
+        <input type="email" id="emailInput" placeholder="your@email.com" onkeydown="if(event.key==='Enter')lookup()">
+        <button class="lookup-btn" onclick="lookup()">Look Up</button>
+      </div>
+      <div class="lookup-msg msg-err" id="errMsg"></div>
+    </div>
+  </div>
+
+  <div id="results">
+    <div class="card">
+      <div class="greeting" id="greetingName"></div>
+      <div class="subline" id="greetingEmail"></div>
+      <div id="scheduleBody"></div>
+      <div class="pending-note" id="pendingNote" style="display:none">
+        ⏳ Some of your submitted availability is still pending confirmation. Check back here for updates, or contact the camp coordinator.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+
+// Group camp names by week label (first part before ·)
+function weekOf(campName) {
+  return campName.split('·')[0].trim();
+}
+
+async function lookup() {
+  const email = document.getElementById('emailInput').value.trim();
+  const errEl = document.getElementById('errMsg');
+  errEl.style.display = 'none';
+
+  if (!email) {
+    errEl.textContent = 'Please enter your email address.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const res = await fetch(`/api/staff/schedule?email=${encodeURIComponent(email)}`);
+
+  if (res.status === 404) {
+    errEl.textContent = 'No record found for that email. Make sure you used the same address when you submitted.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!res.ok) {
+    errEl.textContent = 'Error loading schedule. Please try again.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const { name, confirmed, pending } = await res.json();
+
+  document.getElementById('greetingName').textContent = `Hi, ${name}!`;
+  document.getElementById('greetingEmail').textContent = email;
+
+  // Build confirmed schedule grouped by camp then show days
+  // Group by camp
+  const campMap = {};
+  confirmed.forEach(r => {
+    if (!campMap[r.camp]) campMap[r.camp] = {};
+    campMap[r.camp][r.day] = r.shift;
+  });
+
+  // Also track which camps have pending
+  const pendingCamps = new Set(pending.map(r => r.camp));
+
+  // Get all camps the staff member appears in (confirmed + pending)
+  const allCamps = new Set([...Object.keys(campMap), ...Array.from(pendingCamps)]);
+
+  if (allCamps.size === 0) {
+    document.getElementById('scheduleBody').innerHTML =
+      '<div class="empty-state">No confirmed shifts yet. Check back soon!</div>';
+    document.getElementById('pendingNote').style.display = 'none';
+    document.getElementById('results').style.display = 'block';
+    return;
+  }
+
+  // Sort camps in schedule order (same order as submission form)
+  const CAMP_ORDER = [
+    'June 15–19 · Seattle University',
+    'June 22–26 · Seattle University',
+    'June 22–26 · West Seattle Del Ridge',
+    'July 6–10 · Seattle University',
+    'July 6–10 · Lower Woodland',
+    'July 6–10 · Kirkland',
+    'July 13–17 · Seattle University',
+    'July 13–17 · West Seattle Hiawatha',
+    'July 13–17 · Issaquah',
+    'July 20–24 · Seattle University',
+    'July 20–24 · West Seattle Del Ridge',
+    'July 20–24 · Bothell',
+    'Aug 3–7 · Washington Park',
+    'Aug 3–7 · Bellevue',
+    'Aug 10–14 · Lower Woodland',
+    'Aug 10–14 · Issaquah',
+    'Aug 17–21 · West Seattle Del Ridge',
+    'Aug 17–21 · Bellevue',
+  ];
+
+  const sortedCamps = CAMP_ORDER.filter(c => allCamps.has(c));
+  // Add any camps not in the order list at the end
+  allCamps.forEach(c => { if (!CAMP_ORDER.includes(c)) sortedCamps.push(c); });
+
+  // Group by week
+  let html = '';
+  let lastWeek = null;
+
+  sortedCamps.forEach(campName => {
+    const week = weekOf(campName);
+    if (week !== lastWeek) {
+      html += `<div class="week-header">${week}</div>`;
+      lastWeek = week;
+    }
+
+    const days = campMap[campName] || {};
+    const hasPending = pendingCamps.has(campName);
+    const hasConfirmed = Object.keys(days).length > 0;
+
+    html += `<div class="camp-block">
+      <div class="camp-name">${campName}</div>
+      <div class="day-list">`;
+
+    if (hasConfirmed) {
+      DAYS.forEach(d => {
+        const shift = days[d];
+        if (!shift) return;
+        const cls = shift === 'full' ? 'chip-full' : shift === 'am' ? 'chip-am' : 'chip-pm';
+        const label = shift === 'full' ? `${d} Full Day` : shift === 'am' ? `${d} AM` : `${d} PM`;
+        html += `<span class="day-chip ${cls}">${label}</span>`;
+      });
+    }
+
+    if (hasPending && !hasConfirmed) {
+      html += `<span class="day-chip chip-pending">Pending confirmation</span>`;
+    } else if (hasPending) {
+      html += `<span class="day-chip chip-pending">Some days pending</span>`;
+    }
+
+    html += `</div></div>`;
+  });
+
+  document.getElementById('scheduleBody').innerHTML = html;
+  document.getElementById('pendingNote').style.display = pending.length > 0 ? 'block' : 'none';
+  document.getElementById('results').style.display = 'block';
+}
+</script>
+</body>
+</html>
