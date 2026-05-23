@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nike Soccer Camp — Director Availability</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #222; }
+  header { background: #111; color: #fff; padding: 18px 24px; }
+  header h1 { font-size: 1.2rem; font-weight: 700; }
+  header p { font-size: 0.85rem; opacity: 0.55; margin-top: 3px; }
+  .container { max-width: 680px; margin: 28px auto; padding: 0 14px 60px; }
+  .card { background: #fff; border-radius: 10px; padding: 22px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  h2 { font-size: 1rem; font-weight: 700; margin-bottom: 16px; }
+  label.field-label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 4px; color: #555; }
+  input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; margin-bottom: 14px; }
+  input:focus { outline: none; border-color: #0066cc; }
+
+  .notice { background: #e8f4ff; border: 1px solid #b3d7ff; border-radius: 8px; padding: 13px 16px;
+    font-size: 0.85rem; color: #004499; margin-bottom: 20px; line-height: 1.5; }
+
+  /* Lookup bar */
+  .lookup-bar { background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; }
+  .lookup-bar p { font-size: 0.83rem; color: #664d03; margin-bottom: 10px; font-weight: 600; }
+  .lookup-row { display: flex; gap: 8px; }
+  .lookup-row input { flex: 1; margin-bottom: 0; }
+  .lookup-btn { white-space: nowrap; padding: 10px 16px; background: #f0a500; color: #fff; border: none;
+    border-radius: 6px; font-size: 0.88rem; font-weight: 700; cursor: pointer; }
+  .lookup-btn:hover { background: #cc8800; }
+  .lookup-msg { font-size: 0.8rem; margin-top: 7px; display: none; }
+  .lookup-ok { color: #1a7a3a; } .lookup-err { color: #cc0000; }
+  .edit-banner { display: none; background: #e8f4ff; border: 1px solid #b3d7ff; border-radius: 8px;
+    padding: 11px 16px; font-size: 0.83rem; color: #004499; margin-bottom: 14px; }
+
+  /* Week sections */
+  .week-header { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: #999; padding: 8px 0 6px; border-bottom: 2px solid #f0f0f0; margin: 22px 0 12px; }
+
+  /* Camp checkboxes */
+  .camp-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px;
+    border: 1px solid #e8e8e8; border-radius: 8px; margin-bottom: 8px; cursor: pointer;
+    transition: background 0.1s; }
+  .camp-row:hover { background: #f8f8f8; }
+  .camp-row.selected { background: #e8f4ff; border-color: #b3d7ff; }
+  .camp-row input[type=checkbox] { width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: #0066cc; }
+  .camp-name { font-size: 0.9rem; font-weight: 600; color: #222; }
+
+  .submit-btn { width: 100%; background: #111; color: #fff; border: none; padding: 14px;
+    border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 8px; }
+  .submit-btn:hover { background: #333; }
+
+  #successMsg { display: none; background: #e8ffee; border: 1px solid #7ed8a0; border-radius: 8px;
+    padding: 22px; text-align: center; font-size: 1rem; font-weight: 600; color: #1a7a3a; margin-top: 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ Nike Soccer Camp — Director Availability</h1>
+  <p>Seattle Soccer ID Camps 2026</p>
+</header>
+
+<div class="container">
+  <div class="card">
+    <div class="notice">
+      Select every camp week you're available to direct. You'll be contacted to confirm your assignment.
+      Already submitted? Load your availability below to update it.
+    </div>
+
+    <!-- Lookup -->
+    <div class="lookup-bar">
+      <p>🔄 Already submitted? Load your availability to update it.</p>
+      <div class="lookup-row">
+        <input type="email" id="lookupEmail" placeholder="Enter your email address">
+        <button type="button" class="lookup-btn" onclick="loadExisting()">Load My Availability</button>
+      </div>
+      <div class="lookup-msg lookup-ok" id="lookupOk">✅ Loaded! Make your changes and hit Save below.</div>
+      <div class="lookup-msg lookup-err" id="lookupErr">No submission found for that email.</div>
+    </div>
+
+    <div class="edit-banner" id="editBanner">✏️ Editing availability for <strong id="editName"></strong></div>
+
+    <form id="dirForm">
+      <h2>Your Info</h2>
+      <label class="field-label">Full Name *</label>
+      <input type="text" name="name" required placeholder="Jane Smith">
+      <label class="field-label">Email *</label>
+      <input type="email" name="email" required placeholder="jane@example.com">
+      <label class="field-label">Phone</label>
+      <input type="tel" name="phone" placeholder="(206) 555-0100">
+
+      <h2>Camp Availability</h2>
+      <p style="font-size:0.83rem;color:#888;margin-bottom:14px">Check every camp week you're available to direct.</p>
+      <div id="campList"></div>
+
+      <button type="submit" class="submit-btn">Submit My Availability →</button>
+    </form>
+    <div id="successMsg">✅ Submitted! We'll be in touch to confirm your assignment.</div>
+  </div>
+</div>
+
+<script>
+const CAMPS = [
+  { week: 'June 15–19',  name: 'June 15\u201319 \u00b7 Seattle University' },
+  { week: 'June 22–26',  name: 'June 22\u201326 \u00b7 Seattle University' },
+  { week: 'June 22–26',  name: 'June 22\u201326 \u00b7 West Seattle Del Ridge' },
+  { week: 'July 6–10',   name: 'July 6\u201310 \u00b7 Seattle University' },
+  { week: 'July 6–10',   name: 'July 6\u201310 \u00b7 Lower Woodland' },
+  { week: 'July 6–10',   name: 'July 6\u201310 \u00b7 Kirkland' },
+  { week: 'July 13–17',  name: 'July 13\u201317 \u00b7 Seattle University' },
+  { week: 'July 13–17',  name: 'July 13\u201317 \u00b7 West Seattle Hiawatha' },
+  { week: 'July 13–17',  name: 'July 13\u201317 \u00b7 Issaquah' },
+  { week: 'July 20–24',  name: 'July 20\u201324 \u00b7 Seattle University' },
+  { week: 'July 20–24',  name: 'July 20\u201324 \u00b7 West Seattle Del Ridge' },
+  { week: 'July 20–24',  name: 'July 20\u201324 \u00b7 Bothell' },
+  { week: 'Aug 3–7',     name: 'Aug 3\u20137 \u00b7 Washington Park' },
+  { week: 'Aug 3–7',     name: 'Aug 3\u20137 \u00b7 Bellevue' },
+  { week: 'Aug 10–14',   name: 'Aug 10\u201314 \u00b7 Lower Woodland' },
+  { week: 'Aug 10–14',   name: 'Aug 10\u201314 \u00b7 Issaquah' },
+  { week: 'Aug 17–21',   name: 'Aug 17\u201321 \u00b7 West Seattle Del Ridge' },
+  { week: 'Aug 17–21',   name: 'Aug 17\u201321 \u00b7 Bellevue' },
+];
+
+// Build camp list
+let lastWeek = '';
+const campList = document.getElementById('campList');
+CAMPS.forEach((camp, ci) => {
+  if (camp.week !== lastWeek) {
+    lastWeek = camp.week;
+    const wh = document.createElement('div');
+    wh.className = 'week-header';
+    wh.textContent = camp.week;
+    campList.appendChild(wh);
+  }
+  const row = document.createElement('label');
+  row.className = 'camp-row';
+  row.htmlFor = `camp-${ci}`;
+  row.innerHTML = `
+    <input type="checkbox" id="camp-${ci}" name="camps" value="${camp.name}">
+    <span class="camp-name">${camp.name}</span>`;
+  row.querySelector('input').addEventListener('change', e => {
+    row.classList.toggle('selected', e.target.checked);
+  });
+  campList.appendChild(row);
+});
+
+async function loadExisting() {
+  const email = document.getElementById('lookupEmail').value.trim();
+  if (!email) return;
+  document.getElementById('lookupOk').style.display = 'none';
+  document.getElementById('lookupErr').style.display = 'none';
+
+  const res = await fetch('/api/director-signup?email=' + encodeURIComponent(email));
+  if (!res.ok) {
+    document.getElementById('lookupErr').style.display = 'block';
+    return;
+  }
+  const { director, camps } = await res.json();
+
+  document.querySelector('[name=name]').value  = director.name || '';
+  document.querySelector('[name=email]').value = director.email || '';
+  document.querySelector('[name=phone]').value = director.phone || '';
+
+  // Reset checkboxes then apply saved
+  document.querySelectorAll('input[name=camps]').forEach(cb => {
+    cb.checked = camps.includes(cb.value);
+    cb.closest('.camp-row').classList.toggle('selected', cb.checked);
+  });
+
+  document.getElementById('editBanner').style.display = 'block';
+  document.getElementById('editName').textContent = director.name;
+  document.querySelector('.submit-btn').textContent = 'Save Changes →';
+  document.getElementById('lookupOk').style.display = 'block';
+  document.getElementById('lookupEmail').value = '';
+  document.getElementById('dirForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+document.getElementById('dirForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const camps = [...document.querySelectorAll('input[name=camps]:checked')].map(cb => cb.value);
+  const body = {
+    name: fd.get('name'),
+    email: fd.get('email'),
+    phone: fd.get('phone'),
+    camps
+  };
+  const res = await fetch('/api/director-signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (data.ok) {
+    e.target.style.display = 'none';
+    document.getElementById('successMsg').style.display = 'block';
+  } else {
+    alert('Error: ' + (data.error || 'Unknown error'));
+  }
+});
+</script>
+</body>
+</html>

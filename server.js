@@ -44,7 +44,8 @@ if (IS_PG) {
       CREATE TABLE IF NOT EXISTS directors (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL UNIQUE,
-        email TEXT
+        email TEXT,
+        phone TEXT
       );
       CREATE TABLE IF NOT EXISTS director_assignments (
         id SERIAL PRIMARY KEY,
@@ -71,6 +72,12 @@ if (IS_PG) {
         notes TEXT,
         rated_at TIMESTAMPTZ DEFAULT NOW(),
         UNIQUE(staff_id, camp, director_id)
+      );
+      CREATE TABLE IF NOT EXISTS director_availability (
+        id SERIAL PRIMARY KEY,
+        director_id INTEGER NOT NULL REFERENCES directors(id) ON DELETE CASCADE,
+        camp TEXT NOT NULL,
+        UNIQUE(director_id, camp)
       );
     `);
   }};
@@ -112,7 +119,8 @@ if (IS_PG) {
     CREATE TABLE IF NOT EXISTS directors (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
-      email TEXT
+      email TEXT,
+      phone TEXT
     );
     CREATE TABLE IF NOT EXISTS director_assignments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -139,6 +147,12 @@ if (IS_PG) {
       notes TEXT,
       rated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(staff_id, camp, director_id)
+    );
+    CREATE TABLE IF NOT EXISTS director_availability (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      director_id INTEGER NOT NULL REFERENCES directors(id) ON DELETE CASCADE,
+      camp TEXT NOT NULL,
+      UNIQUE(director_id, camp)
     );
   `);
 
@@ -181,6 +195,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin',    (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 app.get('/director', (req, res) => res.sendFile(path.join(__dirname, 'public', 'director.html')));
 app.get('/schedule', (req, res) => res.sendFile(path.join(__dirname, 'public', 'schedule.html')));
+app.get('/director-signup', (req, res) => res.sendFile(path.join(__dirname, 'public', 'director-signup.html')));
 
 // ── Staff Submission ──────────────────────────────────────
 app.post('/api/submit', async (req, res) => {
@@ -466,6 +481,66 @@ app.post('/api/admin/rating', requireAdmin, async (req, res) => {
         [staff_id, rating, notes]);
     }
     res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── Director Availability Signup (public) ────────────────────────────────────
+// GET /api/director-signup?email=... → lookup director + their availability
+app.get('/api/director-signup', async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+    const rows = await query('SELECT * FROM directors WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const director = rows[0];
+    const avail = await query('SELECT camp FROM director_availability WHERE director_id = $1', [director.id]);
+    res.json({ director, camps: avail.map(a => a.camp) });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/director-signup → create/update director + availability
+app.post('/api/director-signup', async (req, res) => {
+  try {
+    const { name, email, phone, camps } = req.body;
+    if (!name || !email) return res.status(400).json({ error: 'Name and email required' });
+    // Upsert director (create if new, update if existing)
+    let directorId;
+    const existing = await query('SELECT * FROM directors WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+    if (existing.length > 0) {
+      directorId = existing[0].id;
+      await query('UPDATE directors SET name=$1, phone=$2 WHERE id=$3', [name, phone || null, directorId]);
+    } else {
+      const rows = await query(
+        'INSERT INTO directors (name, email, phone) VALUES ($1,$2,$3) RETURNING *',
+        [name, email.trim(), phone || null]
+      );
+      directorId = rows[0].id;
+    }
+    // Replace availability
+    await query('DELETE FROM director_availability WHERE director_id = $1', [directorId]);
+    if (camps && camps.length > 0) {
+      for (const camp of camps) {
+        if (IS_PG) {
+          await query('INSERT INTO director_availability (director_id, camp) VALUES ($1,$2) ON CONFLICT DO NOTHING', [directorId, camp]);
+        } else {
+          await query('INSERT OR IGNORE INTO director_availability (director_id, camp) VALUES ($1,$2)', [directorId, camp]);
+        }
+      }
+    }
+    res.json({ ok: true, message: existing.length > 0 ? 'Availability updated!' : 'Submitted successfully!' });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Admin: view all director availability
+app.get('/api/admin/director-availability', requireAdmin, async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT da.camp, d.id as director_id, d.name, d.email, d.phone
+      FROM director_availability da
+      JOIN directors d ON da.director_id = d.id
+      ORDER BY da.camp, d.name
+    `);
+    res.json(rows);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
