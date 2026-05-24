@@ -80,6 +80,8 @@ if (IS_PG) {
         UNIQUE(director_id, camp)
       );
     `);
+    // Migrations: add columns that may be missing from tables created before schema updates
+    await pool.query(`ALTER TABLE directors ADD COLUMN IF NOT EXISTS phone TEXT`);
   }};
 } else {
   const Database = require('better-sqlite3');
@@ -96,6 +98,10 @@ if (IS_PG) {
   if (staffCols.length > 0 && !staffCols.includes('birthdate')) {
     sqlite.exec('ALTER TABLE staff ADD COLUMN birthdate TEXT');
     sqlite.exec('ALTER TABLE staff ADD COLUMN address TEXT');
+  }
+  const dirCols = sqlite.prepare("PRAGMA table_info(directors)").all().map(c => c.name);
+  if (dirCols.length > 0 && !dirCols.includes('phone')) {
+    sqlite.exec('ALTER TABLE directors ADD COLUMN phone TEXT');
   }
 
   sqlite.exec(`
