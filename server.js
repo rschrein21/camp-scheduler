@@ -503,12 +503,14 @@ app.post('/api/director-signup', async (req, res) => {
   try {
     const { name, email, phone, camps } = req.body;
     if (!name || !email) return res.status(400).json({ error: 'Name and email required' });
-    // Upsert director (create if new, update if existing)
+    // Upsert director: check by email first, then by name (admin may have added without email)
     let directorId;
-    const existing = await query('SELECT * FROM directors WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+    let byEmail = await query('SELECT * FROM directors WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+    let byName  = await query('SELECT * FROM directors WHERE LOWER(name)  = LOWER($1)', [name.trim()]);
+    const existing = byEmail.length > 0 ? byEmail : byName;
     if (existing.length > 0) {
       directorId = existing[0].id;
-      await query('UPDATE directors SET name=$1, phone=$2 WHERE id=$3', [name, phone || null, directorId]);
+      await query('UPDATE directors SET name=$1, email=$2, phone=$3 WHERE id=$4', [name, email.trim(), phone || null, directorId]);
     } else {
       const rows = await query(
         'INSERT INTO directors (name, email, phone) VALUES ($1,$2,$3) RETURNING *',
