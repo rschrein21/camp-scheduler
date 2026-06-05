@@ -453,20 +453,41 @@ function renderDirectors() {
     sel.appendChild(opt);
   });
 
-  // Assignments list
+  // Assignments list — show ALL camps, even unassigned
+  const allCampNames = [
+    'June 15\u201319 \u00b7 Seattle University','June 22\u201326 \u00b7 Seattle University','June 22\u201326 \u00b7 West Seattle Del Ridge',
+    'July 6\u201310 \u00b7 Seattle University','July 6\u201310 \u00b7 Lower Woodland','July 6\u201310 \u00b7 Kirkland',
+    'July 13\u201317 \u00b7 Seattle University','July 13\u201317 \u00b7 West Seattle Hiawatha','July 13\u201317 \u00b7 Issaquah',
+    'July 20\u201324 \u00b7 Seattle University','July 20\u201324 \u00b7 West Seattle Del Ridge','July 20\u201324 \u00b7 Bothell',
+    'Aug 3\u20137 \u00b7 Washington Park','Aug 3\u20137 \u00b7 Bellevue',
+    'Aug 10\u201314 \u00b7 Lower Woodland','Aug 10\u201314 \u00b7 Issaquah',
+    'Aug 17\u201321 \u00b7 West Seattle Del Ridge','Aug 17\u201321 \u00b7 Bellevue'
+  ];
+  const assignByCamp = {};
+  assignments.forEach(a => {
+    if (!assignByCamp[a.camp]) assignByCamp[a.camp] = [];
+    assignByCamp[a.camp].push(a);
+  });
   let aHtml = `<table class="sched">
-    <thead><tr><th>Director</th><th>Camp</th><th style="width:80px">Action</th></tr></thead><tbody>`;
-  if (!assignments.length) {
-    aHtml += `<tr><td colspan="3" style="text-align:center;color:#bbb;padding:16px">No assignments yet</td></tr>`;
-  } else {
-    assignments.forEach(a => {
-      aHtml += `<tr>
-        <td><strong>${a.director_name}</strong></td>
-        <td style="font-size:0.82rem">${a.camp}</td>
-        <td><button onclick="removeAssignment(${a.id})" style="padding:4px 10px;background:#fff0f0;color:#aa0000;border:1px solid #ffb3b3;border-radius:5px;font-size:0.78rem;cursor:pointer">Remove</button></td>
+    <thead><tr><th>Camp</th><th>Director</th><th style="width:80px">Action</th></tr></thead><tbody>`;
+  allCampNames.forEach(camp => {
+    const campAssignments = assignByCamp[camp] || [];
+    if (campAssignments.length) {
+      campAssignments.forEach(a => {
+        aHtml += `<tr>
+          <td style="font-size:0.82rem">${camp}</td>
+          <td><strong>${a.director_name}</strong></td>
+          <td><button onclick="removeAssignment(${a.id})" style="padding:4px 10px;background:#fff0f0;color:#aa0000;border:1px solid #ffb3b3;border-radius:5px;font-size:0.78rem;cursor:pointer">Remove</button></td>
+        </tr>`;
+      });
+    } else {
+      aHtml += `<tr style="background:#fffbe8">
+        <td style="font-size:0.82rem">${camp}</td>
+        <td style="color:#bbb;font-style:italic;font-size:0.82rem">— unassigned —</td>
+        <td></td>
       </tr>`;
-    });
-  }
+    }
+  });
   aHtml += `</tbody></table>`;
   document.getElementById('assignmentsList').innerHTML = aHtml;
 
