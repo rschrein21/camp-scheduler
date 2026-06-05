@@ -543,6 +543,28 @@ app.post('/api/admin/status', requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
+// One-time backfill: auto-decline conflicts for all already-confirmed staff
+app.post('/api/admin/backfill-conflicts', requireAdmin, async (req, res) => {
+  try {
+    const confirmed = await query("SELECT DISTINCT staff_id, camp FROM requests WHERE status = 'confirmed'");
+    let declined = 0;
+    for (const { staff_id, camp } of confirmed) {
+      const datePart = camp.split(' \u00b7 ')[0];
+      if (!datePart) continue;
+      const others = await query(
+        "SELECT DISTINCT camp FROM requests WHERE staff_id = $1 AND camp != $2 AND status != 'declined'",
+        [staff_id, camp]
+      );
+      const conflicts = others.filter(r => r.camp.startsWith(datePart + ' \u00b7'));
+      for (const conflict of conflicts) {
+        await query("UPDATE requests SET status = 'declined' WHERE staff_id = $1 AND camp = $2", [staff_id, conflict.camp]);
+        declined++;
+      }
+    }
+    res.json({ ok: true, declined });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/admin/rating', requireAdmin, async (req, res) => {
   try {
     const { staff_id, rating, notes } = req.body;
