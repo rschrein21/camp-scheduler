@@ -79,6 +79,14 @@ if (IS_PG) {
         camp TEXT NOT NULL,
         UNIQUE(director_id, camp)
       );
+      CREATE TABLE IF NOT EXISTS staff_notifications (
+        id SERIAL PRIMARY KEY,
+        staff_id INTEGER NOT NULL REFERENCES staff(id),
+        staff_name TEXT NOT NULL,
+        action TEXT NOT NULL DEFAULT 'updated',
+        submitted_at TIMESTAMPTZ DEFAULT NOW(),
+        sent INTEGER NOT NULL DEFAULT 0
+      );
     `);
     // Migrations: add columns that may be missing from tables created before schema updates
     await pool.query(`ALTER TABLE directors ADD COLUMN IF NOT EXISTS phone TEXT`);
@@ -160,6 +168,14 @@ if (IS_PG) {
       camp TEXT NOT NULL,
       UNIQUE(director_id, camp)
     );
+    CREATE TABLE IF NOT EXISTS staff_notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      staff_id INTEGER NOT NULL,
+      staff_name TEXT NOT NULL,
+      action TEXT NOT NULL DEFAULT 'updated',
+      submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      sent INTEGER NOT NULL DEFAULT 0
+    );
   `);
 
   // Wrap sqlite in async-compatible interface
@@ -232,7 +248,39 @@ app.post('/api/submit', async (req, res) => {
       }
     }
 
+    const action = existing.length > 0 ? 'updated' : 'new';
+    await query(
+      'INSERT INTO staff_notifications (staff_id, staff_name, action) VALUES ($1,$2,$3)',
+      [staffId, name, action]
+    );
+
     res.json({ ok: true, message: existing.length > 0 ? 'Availability updated!' : 'Submitted successfully!' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── Internal Notification Endpoints ──────────────────────
+app.get('/api/internal/pending-updates', async (req, res) => {
+  try {
+    const rows = await query(
+      'SELECT * FROM staff_notifications WHERE sent = 0 ORDER BY submitted_at ASC'
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/internal/mark-sent', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !ids.length) return res.json({ ok: true, updated: 0 });
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+    await query(`UPDATE staff_notifications SET sent = 1 WHERE id IN (${placeholders})`, ids);
+    res.json({ ok: true, updated: ids.length });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -470,6 +518,27 @@ app.post('/api/admin/status', requireAdmin, async (req, res) => {
   try {
     const { staff_id, camp, status } = req.body;
     await query('UPDATE requests SET status = $1 WHERE staff_id = $2 AND camp = $3', [status, staff_id, camp]);
+
+    // Auto-decline conflicting camps when confirming:
+    // Camp names are like "June 15–19 · Seattle University" — same date prefix = same week
+    if (status === 'confirmed') {
+      const datePart = camp.split(' · ')[0]; // e.g. "June 15–19"
+      if (datePart) {
+        // Decline all other requests from this staff member for camps with the same date range
+        const rows = await query(
+          "SELECT DISTINCT camp FROM requests WHERE staff_id = $1 AND camp != $2 AND status != 'declined'",
+          [staff_id, camp]
+        );
+        const conflicts = rows.filter(r => r.camp.startsWith(datePart + ' ·'));
+        for (const conflict of conflicts) {
+          await query(
+            "UPDATE requests SET status = 'declined' WHERE staff_id = $1 AND camp = $2",
+            [staff_id, conflict.camp]
+          );
+        }
+      }
+    }
+
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
