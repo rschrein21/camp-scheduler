@@ -263,7 +263,7 @@ function renderCamps() {
     const need = CAMP_NEEDS[campName] || {am:0, pm:0};
     const confirmed = staffArr.filter(s => s.status === 'confirmed').length;
     const confirmedAM = staffArr.filter(s => s.status === 'confirmed' && (Object.values(s.days).includes('am') || Object.values(s.days).includes('full'))).length;
-    const confirmedPM = staffArr.filter(s => s.status === 'confirmed' && Object.values(s.days).includes('full')).length;
+    const confirmedPM = staffArr.filter(s => s.status === 'confirmed' && (Object.values(s.days).includes('pm') || Object.values(s.days).includes('full'))).length;
     const amOk = confirmedAM >= need.am;
     const pmOk = confirmedPM >= need.pm;
 
@@ -273,7 +273,8 @@ function renderCamps() {
         <div class="need-split">
           <span class="need-am">AM need: ${need.am}</span>
           <span class="need-pm">PM need: ${need.pm}</span>
-          <span class="conf-count ${amOk ? 'conf-ok' : 'conf-short'}">Confirmed: ${confirmed}</span>
+          <span class="conf-count ${amOk ? 'conf-ok' : 'conf-short'}">AM confirmed: ${confirmedAM}</span>
+          <span class="conf-count ${pmOk ? 'conf-ok' : 'conf-short'}">PM confirmed: ${confirmedPM}</span>
         </div>
       </div>`;
 
