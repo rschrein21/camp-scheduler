@@ -51,9 +51,17 @@
   .db-none { color: #ccc; font-size: 0.7rem; }
 
   .status-select { padding: 5px 7px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.8rem; cursor: pointer; }
-  .status-pending   { background: #fff; }
-  .status-confirmed { background: #e8ffee; color: #1a7a3a; border-color: #7ed8a0; }
-  .status-declined  { background: #fff0f0; color: #aa0000; border-color: #ffb3b3; }
+  .status-pending          { background: #fff; }
+  .status-confirmed        { background: #e8ffee; color: #1a7a3a; border-color: #7ed8a0; }
+  .status-confirmed-am     { background: #fef3c7; color: #92400e; border-color: #f59e0b; }
+  .status-confirmed-pm     { background: #ede9fe; color: #5b21b6; border-color: #8b5cf6; }
+  .status-declined         { background: #fff0f0; color: #aa0000; border-color: #ffb3b3; }
+  .detail-btn { margin-top: 5px; padding: 3px 8px; background: #f0f0f0; color: #555; border: 1px solid #ddd; border-radius: 4px; font-size: 0.73rem; cursor: pointer; display: block; width: 100%; }
+  .detail-btn:hover { background: #e0e0e0; }
+  .detail-row td { background: #fafafa; padding: 6px 10px; }
+  .db-cancelled { background: #f3f4f6; color: #999; text-decoration: line-through; }
+  .day-cancel-btn  { padding: 3px 8px; background: #fff0f0; color: #aa0000; border: 1px solid #ffb3b3; border-radius: 4px; font-size: 0.73rem; cursor: pointer; }
+  .day-restore-btn { padding: 3px 8px; background: #e8ffee; color: #1a7a3a; border: 1px solid #7ed8a0; border-radius: 4px; font-size: 0.73rem; cursor: pointer; }
 
   .rating-stars { color: #f0a500; font-size: 0.85rem; }
   .role-badge { display:inline-block; background:#111; color:#fff; border-radius:8px; padding:2px 7px; font-size:0.72rem; font-weight:700; }
@@ -213,11 +221,42 @@ async function load() {
   renderCamps(); renderStaff();
 }
 
-function dayBadge(shift) {
+function dayBadge(shift, cancelled) {
+  if (cancelled) return `<span class="day-badge db-cancelled">Cancelled</span>`;
   if (!shift) return `<span class="day-badge db-none">—</span>`;
   if (shift === 'full') return `<span class="day-badge db-full">Full</span>`;
   if (shift === 'am')   return `<span class="day-badge db-am">AM</span>`;
   return `<span class="day-badge db-pm">PM</span>`;
+}
+
+function effectiveShift(staffEntry) {
+  // If admin set a confirmed_shift override, that's the effective shift
+  if (staffEntry.confirmedShift) return staffEntry.confirmedShift;
+  // Otherwise derive from submitted shifts
+  const shifts = Object.values(staffEntry.days).map(d => d.shift);
+  const hasAM = shifts.some(s => s === 'am' || s === 'full');
+  const hasPM = shifts.some(s => s === 'pm' || s === 'full');
+  if (hasAM && hasPM) return 'full';
+  if (hasAM) return 'am';
+  if (hasPM) return 'pm';
+  return null;
+}
+
+function dropdownVal(overallStatus, confirmedShift) {
+  if (overallStatus === 'confirmed') {
+    if (confirmedShift === 'am') return 'confirmed_am';
+    if (confirmedShift === 'pm') return 'confirmed_pm';
+    return 'confirmed';
+  }
+  return overallStatus || 'pending';
+}
+
+function dropdownClass(val) {
+  if (val === 'confirmed_am') return 'status-confirmed-am';
+  if (val === 'confirmed_pm') return 'status-confirmed-pm';
+  if (val === 'confirmed')    return 'status-confirmed';
+  if (val === 'declined')     return 'status-declined';
+  return 'status-pending';
 }
 
 function starsHtml(staffId, cur) {
@@ -230,10 +269,20 @@ function renderCamps() {
   data.camps.forEach(row => {
     if (!campMap[row.camp]) campMap[row.camp] = {};
     const key = row.staff_id;
-    if (!campMap[row.camp][key]) campMap[row.camp][key] = { name: row.name, email: row.email, preferred_role: row.preferred_role, rating: row.rating, staff_id: row.staff_id, days: {}, status: row.status };
-    campMap[row.camp][key].days[row.day] = row.shift;
-    // Use confirmed if any day confirmed
-    if (row.status === 'confirmed') campMap[row.camp][key].status = 'confirmed';
+    if (!campMap[row.camp][key]) campMap[row.camp][key] = {
+      name: row.name, email: row.email, preferred_role: row.preferred_role,
+      rating: row.rating, staff_id: row.staff_id, days: {},
+      overallStatus: row.status, confirmedShift: null
+    };
+    campMap[row.camp][key].days[row.day] = {
+      shift: row.shift, confirmed_shift: row.confirmed_shift,
+      req_id: row.req_id, status: row.status
+    };
+    if (row.confirmed_shift) campMap[row.camp][key].confirmedShift = row.confirmed_shift;
+    // overallStatus: confirmed > pending > declined
+    const cur = campMap[row.camp][key].overallStatus;
+    if (row.status === 'confirmed') campMap[row.camp][key].overallStatus = 'confirmed';
+    else if (row.status === 'pending' && cur !== 'confirmed') campMap[row.camp][key].overallStatus = 'pending';
   });
 
   const campOrder = [
@@ -261,9 +310,16 @@ function renderCamps() {
     const staffMap = campMap[campName] || {};
     const staffArr = Object.values(staffMap);
     const need = CAMP_NEEDS[campName] || {am:0, pm:0};
-    const confirmed = staffArr.filter(s => s.status === 'confirmed').length;
-    const confirmedAM = staffArr.filter(s => s.status === 'confirmed' && (Object.values(s.days).includes('am') || Object.values(s.days).includes('full'))).length;
-    const confirmedPM = staffArr.filter(s => s.status === 'confirmed' && (Object.values(s.days).includes('pm') || Object.values(s.days).includes('full'))).length;
+    const confirmedAM = staffArr.filter(s => {
+      if (s.overallStatus !== 'confirmed') return false;
+      const eff = effectiveShift(s);
+      return eff === 'am' || eff === 'full';
+    }).length;
+    const confirmedPM = staffArr.filter(s => {
+      if (s.overallStatus !== 'confirmed') return false;
+      const eff = effectiveShift(s);
+      return eff === 'pm' || eff === 'full';
+    }).length;
     const amOk = confirmedAM >= need.am;
     const pmOk = confirmedPM >= need.pm;
 
@@ -290,7 +346,10 @@ function renderCamps() {
           <th>Status</th>
         </tr></thead><tbody>`;
       staffArr.forEach(s => {
-        const status = s.status || 'pending';
+        const dval = dropdownVal(s.overallStatus, s.confirmedShift);
+        const dclass = dropdownClass(dval);
+        const safecamp = campName.replace(/'/g, "\\'");
+        const detailId = `detail-${s.staff_id}-${campName.replace(/[^a-z0-9]/gi,'_')}`;
         html += `<tr>
           <td class="name-col">
             <strong>${s.name}</strong><br>
@@ -298,13 +357,46 @@ function renderCamps() {
           </td>
           <td><span class="role-badge">${s.preferred_role || '?'}</span></td>
           <td><span class="rating-stars">${'★'.repeat(s.rating)}${'☆'.repeat(5-s.rating)}</span></td>
-          ${DAYS.map(d => `<td>${dayBadge(s.days[d])}</td>`).join('')}
+          ${DAYS.map(d => {
+            const day = s.days[d];
+            if (!day) return `<td>${dayBadge(null)}</td>`;
+            const effShift = day.confirmed_shift || day.shift;
+            const cancelled = day.status === 'cancelled';
+            return `<td>${dayBadge(effShift, cancelled)}</td>`;
+          }).join('')}
           <td>
-            <select class="status-select status-${status}" onchange="updateStatus(${s.staff_id}, '${campName}', this)">
-              <option value="pending"   ${status==='pending'  ?'selected':''}>Pending</option>
-              <option value="confirmed" ${status==='confirmed'?'selected':''}>✅ Confirmed</option>
-              <option value="declined"  ${status==='declined' ?'selected':''}>❌ Declined</option>
+            <select class="status-select ${dclass}" onchange="updateStatus(${s.staff_id}, '${safecamp}', this)">
+              <option value="pending"      ${dval==='pending'      ?'selected':''}>Pending</option>
+              <option value="confirmed"    ${dval==='confirmed'    ?'selected':''}>✅ Full Week</option>
+              <option value="confirmed_am" ${dval==='confirmed_am' ?'selected':''}>✅ AM Only</option>
+              <option value="confirmed_pm" ${dval==='confirmed_pm' ?'selected':''}>✅ PM Only</option>
+              <option value="declined"     ${dval==='declined'     ?'selected':''}>❌ Declined</option>
             </select>
+            <button class="detail-btn" onclick="toggleDetails('${detailId}')">Details ▾</button>
+          </td>
+        </tr>
+        <tr id="${detailId}" class="detail-row" style="display:none">
+          <td colspan="${DAYS.length + 4}">
+            <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+              ${DAYS.map(d => {
+                const day = s.days[d];
+                if (!day) return '';
+                const effShift = day.confirmed_shift || day.shift;
+                const isCancelled = day.status === 'cancelled';
+                const isConfirmed = day.status === 'confirmed';
+                return `<tr>
+                  <td style="width:55px;font-weight:700">${d}</td>
+                  <td style="width:90px">Sub: ${dayBadge(day.shift)}</td>
+                  <td style="width:90px">Eff: ${dayBadge(effShift, isCancelled)}</td>
+                  <td>${isCancelled
+                    ? `<button class="day-restore-btn" onclick="restoreDay(${day.req_id})">↩ Restore</button>`
+                    : isConfirmed
+                      ? `<button class="day-cancel-btn" onclick="cancelDay(${day.req_id})">🚫 Cancel day</button>`
+                      : '<span style="color:#bbb;font-size:0.75rem">not confirmed</span>'}
+                  </td>
+                </tr>`;
+              }).join('')}
+            </table>
           </td>
         </tr>`;
       });
@@ -390,9 +482,36 @@ function renderStaff(sortBy = 'priority') {
 }
 
 async function updateStatus(staffId, camp, select) {
-  select.className = `status-select status-${select.value}`;
+  const val = select.value;
+  let status, confirmed_shift;
+  if (val === 'confirmed_am')      { status = 'confirmed'; confirmed_shift = 'am'; }
+  else if (val === 'confirmed_pm') { status = 'confirmed'; confirmed_shift = 'pm'; }
+  else if (val === 'confirmed')    { status = 'confirmed'; confirmed_shift = null; }
+  else                             { status = val; confirmed_shift = null; }
+  select.className = `status-select ${dropdownClass(val)}`;
   await fetch('/api/admin/status', { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ staff_id: staffId, camp, status: select.value }) });
+    body: JSON.stringify({ staff_id: staffId, camp, status, confirmed_shift }) });
+  const cr = await fetch('/api/admin/camps');
+  data.camps = await cr.json();
+  renderCamps();
+}
+
+function toggleDetails(detailId) {
+  const el = document.getElementById(detailId);
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+async function cancelDay(reqId) {
+  await fetch('/api/admin/status', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ req_id: reqId, status: 'cancelled', confirmed_shift: null }) });
+  const cr = await fetch('/api/admin/camps');
+  data.camps = await cr.json();
+  renderCamps();
+}
+
+async function restoreDay(reqId) {
+  await fetch('/api/admin/status', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ req_id: reqId, status: 'confirmed', confirmed_shift: null }) });
   const cr = await fetch('/api/admin/camps');
   data.camps = await cr.json();
   renderCamps();

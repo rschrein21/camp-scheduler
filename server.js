@@ -90,6 +90,7 @@ if (IS_PG) {
     `);
     // Migrations: add columns that may be missing from tables created before schema updates
     await pool.query(`ALTER TABLE directors ADD COLUMN IF NOT EXISTS phone TEXT`);
+    await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS confirmed_shift TEXT`);
   }};
 } else {
   const Database = require('better-sqlite3');
@@ -98,6 +99,7 @@ if (IS_PG) {
   // Migrations
   const reqCols = sqlite.prepare("PRAGMA table_info(requests)").all().map(c => c.name);
   if (reqCols.length > 0 && !reqCols.includes('day')) sqlite.exec('DROP TABLE IF EXISTS requests');
+  if (reqCols.length > 0 && !reqCols.includes('confirmed_shift')) sqlite.exec('ALTER TABLE requests ADD COLUMN confirmed_shift TEXT');
   const staffCols = sqlite.prepare("PRAGMA table_info(staff)").all().map(c => c.name);
   if (staffCols.length > 0 && !staffCols.includes('shirt_size')) {
     sqlite.exec('ALTER TABLE staff ADD COLUMN shirt_size TEXT');
@@ -502,7 +504,7 @@ app.get('/api/admin/submissions', requireAdmin, async (req, res) => {
 app.get('/api/admin/camps', requireAdmin, async (req, res) => {
   try {
     const rows = await query(`
-      SELECT r.camp, r.day, r.shift, r.status, r.id as req_id,
+      SELECT r.camp, r.day, r.shift, r.confirmed_shift, r.status, r.id as req_id,
              s.name, s.email, s.phone, s.preferred_role, s.id as staff_id,
              COALESCE(sr.rating, 3) as rating
       FROM requests r
@@ -516,25 +518,37 @@ app.get('/api/admin/camps', requireAdmin, async (req, res) => {
 
 app.post('/api/admin/status', requireAdmin, async (req, res) => {
   try {
-    const { staff_id, camp, status } = req.body;
-    await query('UPDATE requests SET status = $1 WHERE staff_id = $2 AND camp = $3', [status, staff_id, camp]);
+    const { staff_id, camp, status, confirmed_shift, req_id } = req.body;
 
-    // Auto-decline conflicting camps when confirming:
-    // Camp names are like "June 15–19 · Seattle University" — same date prefix = same week
-    if (status === 'confirmed') {
-      const datePart = camp.split(' · ')[0]; // e.g. "June 15–19"
-      if (datePart) {
-        // Decline all other requests from this staff member for camps with the same date range
-        const rows = await query(
-          "SELECT DISTINCT camp FROM requests WHERE staff_id = $1 AND camp != $2 AND status != 'declined'",
-          [staff_id, camp]
-        );
-        const conflicts = rows.filter(r => r.camp.startsWith(datePart + ' ·'));
-        for (const conflict of conflicts) {
-          await query(
-            "UPDATE requests SET status = 'declined' WHERE staff_id = $1 AND camp = $2",
-            [staff_id, conflict.camp]
+    if (req_id) {
+      // Per-day update: update a single request row by id
+      await query(
+        'UPDATE requests SET status = $1, confirmed_shift = $2 WHERE id = $3',
+        [status, confirmed_shift || null, req_id]
+      );
+    } else {
+      // Bulk camp update: update all rows for this staff+camp
+      // confirmed_shift: 'am'|'pm'|'full' overrides submitted shift; null = use submitted
+      await query(
+        'UPDATE requests SET status = $1, confirmed_shift = $2 WHERE staff_id = $3 AND camp = $4',
+        [status, confirmed_shift || null, staff_id, camp]
+      );
+
+      // Auto-decline conflicting camps when confirming:
+      if (status === 'confirmed') {
+        const datePart = camp.split(' \u00b7 ')[0];
+        if (datePart) {
+          const rows = await query(
+            "SELECT DISTINCT camp FROM requests WHERE staff_id = $1 AND camp != $2 AND status != 'declined'",
+            [staff_id, camp]
           );
+          const conflicts = rows.filter(r => r.camp.startsWith(datePart + ' \u00b7'));
+          for (const conflict of conflicts) {
+            await query(
+              "UPDATE requests SET status = 'declined' WHERE staff_id = $1 AND camp = $2",
+              [staff_id, conflict.camp]
+            );
+          }
         }
       }
     }

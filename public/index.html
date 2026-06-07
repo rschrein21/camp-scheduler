@@ -30,6 +30,12 @@
   .full-week-btn { font-size: 0.78rem; font-weight: 700; padding: 5px 11px; border-radius: 14px;
     border: 1px solid #0066cc; color: #0066cc; background: #fff; cursor: pointer; white-space: nowrap; }
   .full-week-btn:hover { background: #0066cc; color: #fff; }
+  .fw-am-btn { font-size: 0.78rem; font-weight: 700; padding: 5px 11px; border-radius: 14px;
+    border: 1px solid #f59e0b; color: #92400e; background: #fef3c7; cursor: pointer; white-space: nowrap; }
+  .fw-am-btn:hover { background: #f59e0b; color: #fff; }
+  .fw-pm-btn { font-size: 0.78rem; font-weight: 700; padding: 5px 11px; border-radius: 14px;
+    border: 1px solid #8b5cf6; color: #5b21b6; background: #ede9fe; cursor: pointer; white-space: nowrap; }
+  .fw-pm-btn:hover { background: #8b5cf6; color: #fff; }
   .clear-btn { font-size: 0.75rem; padding: 4px 9px; border-radius: 12px; border: 1px solid #ddd; color: #999; background: #fff; cursor: pointer; }
   .clear-btn:hover { background: #f0f0f0; }
 
@@ -93,8 +99,8 @@
 <div class="container">
   <div class="card">
     <div class="notice">
-      Select every camp and day you're available. Use <strong>"Full Week"</strong> as a shortcut to mark all days Full Day.
-      Full days and multi-week availability are prioritized when assigning staff. You'll be contacted to confirm.
+      Select every camp you're available for. Use the quick buttons to set your preferred schedule.
+      <strong>Full weeks are preferred</strong> — use the AM / PM / Full buttons to set the whole week at once. You'll be contacted to confirm.
     </div>
 
     <!-- Lookup / update existing submission -->
@@ -201,6 +207,16 @@ function setFullWeek(ci) {
   renderCamp(ci);
 }
 
+function setFullWeekAM(ci) {
+  DAYS.forEach((_, di) => { state[ci][di] = 'am'; });
+  renderCamp(ci);
+}
+
+function setFullWeekPM(ci) {
+  DAYS.forEach((_, di) => { state[ci][di] = 'pm'; });
+  renderCamp(ci);
+}
+
 function clearCamp(ci) {
   DAYS.forEach((_, di) => { state[ci][di] = null; });
   renderCamp(ci);
@@ -245,7 +261,9 @@ CAMPS.forEach((camp, ci) => {
     <div class="camp-top">
       <span class="camp-name">${camp.name}</span>
       <div style="display:flex;gap:6px">
-        <button type="button" class="full-week-btn" onclick="setFullWeek(${ci})">✓ Full Week</button>
+        <button type="button" class="full-week-btn" onclick="setFullWeek(${ci})">Full</button>
+            <button type="button" class="fw-am-btn" onclick="setFullWeekAM(${ci})">AM</button>
+            <button type="button" class="fw-pm-btn" onclick="setFullWeekPM(${ci})">PM</button>
         <button type="button" class="clear-btn" onclick="clearCamp(${ci})">Clear</button>
       </div>
     </div>
