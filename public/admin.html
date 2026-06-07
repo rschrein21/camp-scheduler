@@ -382,27 +382,20 @@ function renderCamps() {
                 const day = s.days[d];
                 if (!day) return '';
                 const effShift = day.confirmed_shift || day.shift;
-                const isCancelled = day.status === 'cancelled';
-                const isConfirmed = day.status === 'confirmed';
-                const selCS = day.confirmed_shift || '';
+                // Effective selected value: confirmed_shift if confirmed, submitted shift as fallback, '' = None
+                const selCS = day.status === 'confirmed'
+                  ? (day.confirmed_shift || day.shift)
+                  : '';
                 return `<tr>
                   <td style="width:50px;font-weight:700">${d}</td>
-                  <td style="width:80px">Sub: ${dayBadge(day.shift)}</td>
+                  <td style="width:80px;color:#aaa;font-size:0.75rem">Sub: ${dayBadge(day.shift)}</td>
                   <td>
-                    <select style="padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:0.75rem;cursor:pointer" onchange="setDayShift(${day.req_id}, this.value)">
-                      <option value=""  ${selCS===''    ?'selected':''}>As submitted</option>
-                      <option value="am" ${selCS==='am'  ?'selected':''}>AM only</option>
-                      <option value="pm" ${selCS==='pm'  ?'selected':''}>PM only</option>
+                    <select style="padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:0.75rem;cursor:pointer" onchange="setDaySchedule(${day.req_id}, this.value)">
+                      <option value=""    ${selCS===''    ?'selected':''}>— None</option>
+                      <option value="am"  ${selCS==='am'  ?'selected':''}>AM</option>
+                      <option value="pm"  ${selCS==='pm'  ?'selected':''}>PM</option>
                       <option value="full" ${selCS==='full'?'selected':''}>Full Day</option>
                     </select>
-                  </td>
-                  <td style="display:flex;gap:4px;flex-wrap:wrap">
-                    ${isCancelled || !isConfirmed
-                      ? `<button class="day-restore-btn" onclick="restoreDay(${day.req_id})">${isCancelled ? '↩ Restore' : '+ Confirm'}</button>`
-                      : `<button class="day-cancel-btn" onclick="cancelDay(${day.req_id})">🚫 Cancel</button>`}
-                    ${day.status !== 'declined'
-                      ? `<button class="day-cancel-btn" style="background:#fff0f0;color:#aa0000" onclick="declineDay(${day.req_id})">❌ Decline</button>`
-                      : `<span style="color:#aa0000;font-size:0.75rem;font-weight:600">❌ Declined</span>`}
                   </td>
                 </tr>`;
               }).join('')}
@@ -511,33 +504,12 @@ function toggleDetails(detailId) {
   if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
 }
 
-async function declineDay(reqId) {
+async function setDaySchedule(reqId, value) {
+  // value = '' (None/not working) | 'am' | 'pm' | 'full'
+  const status = value ? 'confirmed' : 'declined';
+  const confirmed_shift = value || null;
   await fetch('/api/admin/status', { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ req_id: reqId, status: 'declined', confirmed_shift: null }) });
-  const cr = await fetch('/api/admin/camps');
-  data.camps = await cr.json();
-  renderCamps();
-}
-
-async function setDayShift(reqId, confirmedShift) {
-  await fetch('/api/admin/status', { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ req_id: reqId, status: 'confirmed', confirmed_shift: confirmedShift || null }) });
-  const cr = await fetch('/api/admin/camps');
-  data.camps = await cr.json();
-  renderCamps();
-}
-
-async function cancelDay(reqId) {
-  await fetch('/api/admin/status', { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ req_id: reqId, status: 'cancelled', confirmed_shift: null }) });
-  const cr = await fetch('/api/admin/camps');
-  data.camps = await cr.json();
-  renderCamps();
-}
-
-async function restoreDay(reqId) {
-  await fetch('/api/admin/status', { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ req_id: reqId, status: 'confirmed', confirmed_shift: null }) });
+    body: JSON.stringify({ req_id: reqId, status, confirmed_shift }) });
   const cr = await fetch('/api/admin/camps');
   data.camps = await cr.json();
   renderCamps();
