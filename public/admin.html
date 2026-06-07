@@ -230,25 +230,25 @@ function dayBadge(shift, cancelled) {
 }
 
 function effectiveShift(staffEntry) {
-  // If admin set a confirmed_shift override, that's the effective shift
-  if (staffEntry.confirmedShift) return staffEntry.confirmedShift;
-  // Otherwise derive from submitted shifts
-  const shifts = Object.values(staffEntry.days).map(d => d.shift);
-  const hasAM = shifts.some(s => s === 'am' || s === 'full');
-  const hasPM = shifts.some(s => s === 'pm' || s === 'full');
+  // Use per-day confirmed_shift when set, otherwise submitted shift
+  const dayShifts = Object.values(staffEntry.days).map(d => d.confirmed_shift || d.shift);
+  const hasAM = dayShifts.some(s => s === 'am' || s === 'full');
+  const hasPM = dayShifts.some(s => s === 'pm' || s === 'full');
   if (hasAM && hasPM) return 'full';
   if (hasAM) return 'am';
   if (hasPM) return 'pm';
   return null;
 }
 
-function dropdownVal(overallStatus, confirmedShift) {
-  if (overallStatus === 'confirmed') {
-    if (confirmedShift === 'am') return 'confirmed_am';
-    if (confirmedShift === 'pm') return 'confirmed_pm';
-    return 'confirmed';
-  }
-  return overallStatus || 'pending';
+function dropdownVal(overallStatus, staffEntry) {
+  if (overallStatus !== 'confirmed') return overallStatus || 'pending';
+  // Detect if all confirmed days have the same shift override
+  const confirmedDays = Object.values(staffEntry.days).filter(d => d.status === 'confirmed');
+  if (!confirmedDays.length) return 'confirmed';
+  const csVals = [...new Set(confirmedDays.map(d => d.confirmed_shift || ''))];
+  if (csVals.length === 1 && csVals[0] === 'am') return 'confirmed_am';
+  if (csVals.length === 1 && csVals[0] === 'pm') return 'confirmed_pm';
+  return 'confirmed';
 }
 
 function dropdownClass(val) {
@@ -346,7 +346,7 @@ function renderCamps() {
           <th>Status</th>
         </tr></thead><tbody>`;
       staffArr.forEach(s => {
-        const dval = dropdownVal(s.overallStatus, s.confirmedShift);
+        const dval = dropdownVal(s.overallStatus, s);
         const dclass = dropdownClass(dval);
         const safecamp = campName.replace(/'/g, "\\'");
         const detailId = `detail-${s.staff_id}-${campName.replace(/[^a-z0-9]/gi,'_')}`;
@@ -384,15 +384,23 @@ function renderCamps() {
                 const effShift = day.confirmed_shift || day.shift;
                 const isCancelled = day.status === 'cancelled';
                 const isConfirmed = day.status === 'confirmed';
+                const selCS = day.confirmed_shift || '';
                 return `<tr>
-                  <td style="width:55px;font-weight:700">${d}</td>
-                  <td style="width:90px">Sub: ${dayBadge(day.shift)}</td>
-                  <td style="width:90px">Eff: ${dayBadge(effShift, isCancelled)}</td>
+                  <td style="width:50px;font-weight:700">${d}</td>
+                  <td style="width:80px">Sub: ${dayBadge(day.shift)}</td>
+                  <td>
+                    <select style="padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:0.75rem;cursor:pointer" onchange="setDayShift(${day.req_id}, this.value)">
+                      <option value=""  ${selCS===''    ?'selected':''}>As submitted</option>
+                      <option value="am" ${selCS==='am'  ?'selected':''}>AM only</option>
+                      <option value="pm" ${selCS==='pm'  ?'selected':''}>PM only</option>
+                      <option value="full" ${selCS==='full'?'selected':''}>Full Day</option>
+                    </select>
+                  </td>
                   <td>${isCancelled
                     ? `<button class="day-restore-btn" onclick="restoreDay(${day.req_id})">↩ Restore</button>`
                     : isConfirmed
                       ? `<button class="day-cancel-btn" onclick="cancelDay(${day.req_id})">🚫 Cancel day</button>`
-                      : '<span style="color:#bbb;font-size:0.75rem">not confirmed</span>'}
+                      : `<button class="day-restore-btn" onclick="restoreDay(${day.req_id})">+ Confirm day</button>`}
                   </td>
                 </tr>`;
               }).join('')}
@@ -499,6 +507,14 @@ async function updateStatus(staffId, camp, select) {
 function toggleDetails(detailId) {
   const el = document.getElementById(detailId);
   if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+async function setDayShift(reqId, confirmedShift) {
+  await fetch('/api/admin/status', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ req_id: reqId, status: 'confirmed', confirmed_shift: confirmedShift || null }) });
+  const cr = await fetch('/api/admin/camps');
+  data.camps = await cr.json();
+  renderCamps();
 }
 
 async function cancelDay(reqId) {
