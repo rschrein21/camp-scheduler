@@ -210,7 +210,7 @@ function buildCampMap() {
       preferred_role: row.preferred_role, shirt_size: row.shirt_size, shorts_size: row.shorts_size,
       days: {}
     };
-    campMap[row.camp][k].days[row.day] = row.shift;
+    campMap[row.camp][k].days[row.day] = row.confirmed_shift || row.shift;
   });
   return campMap;
 }

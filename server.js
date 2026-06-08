@@ -353,7 +353,7 @@ app.get('/api/director/schedule', requireDirector, async (req, res) => {
   try {
     if (req.session.admin) {
       const rows = await query(`
-        SELECT r.camp, r.day, r.shift,
+        SELECT r.camp, r.day, r.shift, r.confirmed_shift,
                s.name, s.email, s.phone, s.preferred_role, s.shirt_size, s.shorts_size, s.id as staff_id
         FROM requests r
         JOIN staff s ON r.staff_id = s.id
@@ -368,7 +368,7 @@ app.get('/api/director/schedule', requireDirector, async (req, res) => {
     const camps = assignments.map(a => a.camp);
     const placeholders = camps.map((_, i) => `$${i + 1}`).join(',');
     const rows = await query(`
-      SELECT r.camp, r.day, r.shift,
+      SELECT r.camp, r.day, r.shift, r.confirmed_shift,
              s.name, s.email, s.phone, s.preferred_role, s.shirt_size, s.shorts_size, s.id as staff_id
       FROM requests r
       JOIN staff s ON r.staff_id = s.id
