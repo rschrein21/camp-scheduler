@@ -33,6 +33,12 @@
   .need-badge { font-size: 0.78rem; color: #888; }
   .conf-count { font-size: 0.82rem; font-weight: 700; }
   .conf-ok { color: #1a7a3a; } .conf-short { color: #c05c00; }
+  .clickable-count { cursor: pointer; text-decoration: underline dotted; }
+  .clickable-count:hover { opacity: 0.75; }
+  #staffPopover { position: fixed; background: #fff; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 12px 16px; font-size: 0.83rem; z-index: 1000; min-width: 160px; max-width: 260px; display: none; }
+  #staffPopover .pop-title { font-weight: 700; margin-bottom: 8px; color: #444; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  #staffPopover ul { list-style: none; padding: 0; margin: 0; }
+  #staffPopover li { padding: 2px 0; color: #222; }
   .need-split { display:flex; gap:10px; align-items:center; font-size:0.78rem; }
   .need-am { background:#fef3c7; color:#92400e; border-radius:6px; padding:2px 7px; font-weight:700; }
   .need-pm { background:#ede9fe; color:#5b21b6; border-radius:6px; padding:2px 7px; font-weight:700; }
@@ -436,7 +442,7 @@ function renderDailySummary() {
   ];
 
   // Build per-camp, per-day, per-staff unique map (confirmed only)
-  // key: camp → day → staff_id → effective shift
+  // key: camp → day → staff_id → {shift, name}
   const campDayStaff = {};
   data.camps.forEach(row => {
     if (row.status !== 'confirmed') return;
@@ -446,7 +452,7 @@ function renderDailySummary() {
     // Keep 'full' if we see it for this staff_id on this day
     const existing = campDayStaff[row.camp][row.day][row.staff_id];
     if (!existing || eff === 'full') {
-      campDayStaff[row.camp][row.day][row.staff_id] = eff;
+      campDayStaff[row.camp][row.day][row.staff_id] = { shift: eff, name: row.name };
     }
   });
 
@@ -467,16 +473,20 @@ function renderDailySummary() {
         </tr></thead><tbody>`;
     DAYS.forEach(day => {
       const staffOnDay = dayMap[day] || {};
-      const shifts = Object.values(staffOnDay);
-      const amCount = shifts.filter(s => s === 'am' || s === 'full').length;
-      const pmCount = shifts.filter(s => s === 'pm' || s === 'full').length;
+      const entries = Object.values(staffOnDay);
+      const amNames = entries.filter(e => e.shift === 'am' || e.shift === 'full').map(e => e.name).sort();
+      const pmNames = entries.filter(e => e.shift === 'pm' || e.shift === 'full').map(e => e.name).sort();
+      const amCount = amNames.length;
+      const pmCount = pmNames.length;
       const amOk = amCount >= need.am;
       const pmOk = pmCount >= need.pm;
+      const amData = encodeURIComponent(JSON.stringify({title:`AM — ${day}`, names: amNames}));
+      const pmData = encodeURIComponent(JSON.stringify({title:`PM — ${day}`, names: pmNames}));
       html += `<tr>
         <td style="text-align:left;font-weight:600">${day}</td>
-        <td><span class="conf-count ${amOk ? 'conf-ok' : 'conf-short'}" style="font-size:1rem;font-weight:700">${amCount}</span></td>
+        <td><span class="conf-count clickable-count ${amOk ? 'conf-ok' : 'conf-short'}" style="font-size:1rem;font-weight:700" onclick="showStaffPop(event,'${amData}')">${amCount}</span></td>
         <td style="color:#888">${need.am}</td>
-        <td><span class="conf-count ${pmOk ? 'conf-ok' : 'conf-short'}" style="font-size:1rem;font-weight:700">${pmCount}</span></td>
+        <td><span class="conf-count clickable-count ${pmOk ? 'conf-ok' : 'conf-short'}" style="font-size:1rem;font-weight:700" onclick="showStaffPop(event,'${pmData}')">${pmCount}</span></td>
         <td style="color:#888">${need.pm}</td>
       </tr>`;
     });
@@ -761,6 +771,30 @@ async function saveNote(staffId) {
   await fetch('/api/admin/rating', { method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ staff_id: staffId, rating: s?.rating?.rating || 3, notes }) });
 }
+
+function showStaffPop(event, encoded) {
+  event.stopPropagation();
+  const { title, names } = JSON.parse(decodeURIComponent(encoded));
+  const pop = document.getElementById('staffPopover');
+  pop.querySelector('.pop-title').textContent = title;
+  const ul = pop.querySelector('ul');
+  ul.innerHTML = names.length
+    ? names.map(n => `<li>${n}</li>`).join('')
+    : '<li style="color:#999;font-style:italic">No staff</li>';
+  // Position near the clicked element
+  const rect = event.target.getBoundingClientRect();
+  const top = Math.min(rect.bottom + 8, window.innerHeight - 200);
+  const left = Math.min(rect.left, window.innerWidth - 280);
+  pop.style.top = top + 'px';
+  pop.style.left = left + 'px';
+  pop.style.display = 'block';
+}
+
+document.addEventListener('click', () => {
+  const pop = document.getElementById('staffPopover');
+  if (pop) pop.style.display = 'none';
+});
 </script>
+<div id="staffPopover"><div class="pop-title"></div><ul></ul></div>
 </body>
 </html>
