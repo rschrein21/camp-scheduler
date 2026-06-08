@@ -435,17 +435,17 @@ function renderDailySummary() {
     'Aug 17\u201321 \u00b7 Bellevue',
   ];
 
-  // Build per-camp, per-day, per-staff unique map
+  // Build per-camp, per-day, per-staff unique map (confirmed only)
   // key: camp → day → staff_id → effective shift
   const campDayStaff = {};
   data.camps.forEach(row => {
+    if (row.status !== 'confirmed') return;
     if (!campDayStaff[row.camp]) campDayStaff[row.camp] = {};
     if (!campDayStaff[row.camp][row.day]) campDayStaff[row.camp][row.day] = {};
     const eff = row.confirmed_shift || row.shift;
-    // A staff_id may appear in multiple rows for the same day/camp (shouldn't normally happen)
-    // Keep the most permissive shift (full > am/pm)
+    // Keep 'full' if we see it for this staff_id on this day
     const existing = campDayStaff[row.camp][row.day][row.staff_id];
-    if (!existing || eff === 'full' || (eff !== 'full' && !existing)) {
+    if (!existing || eff === 'full') {
       campDayStaff[row.camp][row.day][row.staff_id] = eff;
     }
   });
