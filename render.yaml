@@ -11,6 +11,10 @@ services:
         fromDatabase:
           name: camp-scheduler-db
           property: connectionString
+      - key: GMAIL_USER
+        value: rich.seattlesoccer@gmail.com
+      - key: GMAIL_APP_PASSWORD
+        value: guiplunclnwnqqby
 
 databases:
   - name: camp-scheduler-db
