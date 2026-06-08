@@ -1,11 +1,42 @@
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
+const nodemailer = require('nodemailer');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const IS_PG = !!process.env.DATABASE_URL;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'nikesoccer2025';
 const DIRECTOR_PASSWORD = process.env.DIRECTOR_PASSWORD || 'director2026';
+const BASE_URL = process.env.BASE_URL || 'https://camp-scheduler-tg11.onrender.com';
+
+// ── Email transport ──────────────────────────────────────
+const GMAIL_USER = process.env.GMAIL_USER || 'rich.seattlesoccer@gmail.com';
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || '';
+const emailTransport = GMAIL_APP_PASSWORD ? nodemailer.createTransport({
+  service: 'gmail',
+  auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD }
+}) : null;
+
+async function sendConfirmationEmail(staffName, staffEmail, camp, token) {
+  if (!emailTransport) { console.warn('Email not configured — skipping send'); return; }
+  const link = `${BASE_URL}/staff-confirm?token=${token}`;
+  await emailTransport.sendMail({
+    from: `"Nike Soccer Camps" <${GMAIL_USER}>`,
+    to: staffEmail,
+    subject: `Please confirm your schedule — ${camp}`,
+    html: `
+      <p>Hi ${staffName},</p>
+      <p>Your schedule for <strong>${camp}</strong> has been set. Please click the button below to confirm you'll be there.</p>
+      <p style="margin:24px 0">
+        <a href="${link}" style="background:#111;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:700;font-size:1rem">View &amp; Confirm My Schedule</a>
+      </p>
+      <p style="color:#888;font-size:0.85rem">Or copy this link: ${link}</p>
+      <p>Questions? Reply to this email or contact Rich directly.</p>
+      <p>Thanks,<br>Rich Schreiner<br>Nike Soccer Camps</p>
+    `
+  });
+}
 
 // ── Database setup ────────────────────────────────────────
 let db, query;
@@ -92,6 +123,18 @@ if (IS_PG) {
     await pool.query(`ALTER TABLE directors ADD COLUMN IF NOT EXISTS phone TEXT`);
     await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS confirmed_shift TEXT`);
     await pool.query(`ALTER TABLE director_assignments ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'skills'`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS staff_confirmations (
+        id SERIAL PRIMARY KEY,
+        staff_id INTEGER NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+        camp TEXT NOT NULL,
+        token TEXT NOT NULL UNIQUE,
+        confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+        confirmed_at TIMESTAMP,
+        email_sent_at TIMESTAMP,
+        UNIQUE(staff_id, camp)
+      )
+    `);
     // Replace unique(director_id, camp) with unique(camp, role) so one person can hold different roles across camps
     await pool.query(`ALTER TABLE director_assignments DROP CONSTRAINT IF EXISTS director_assignments_director_id_camp_key`);
     await pool.query(`
@@ -543,6 +586,23 @@ app.post('/api/admin/status', requireAdmin, async (req, res) => {
         [status, confirmed_shift || null, staff_id, camp]
       );
 
+      // When confirming: generate/send confirmation email token
+      if (status === 'confirmed') {
+        const staffRows = await query('SELECT name, email FROM staff WHERE id = $1', [staff_id]);
+        if (staffRows.length && staffRows[0].email) {
+          const { name, email } = staffRows[0];
+          const token = uuidv4();
+          if (IS_PG) {
+            await query(`
+              INSERT INTO staff_confirmations (staff_id, camp, token, email_sent_at)
+              VALUES ($1, $2, $3, NOW())
+              ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, confirmed = FALSE, confirmed_at = NULL, email_sent_at = NOW()
+            `, [staff_id, camp, token]);
+          }
+          sendConfirmationEmail(name, email, camp, token).catch(e => console.error('Email error:', e));
+        }
+      }
+
       // Auto-decline conflicting camps when confirming:
       if (status === 'confirmed') {
         const datePart = camp.split(' \u00b7 ')[0];
@@ -757,6 +817,82 @@ app.get('/api/staff/schedule', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// Serve staff-confirm page
+app.get('/staff-confirm', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'staff-confirm.html'));
+});
+
+// ── Staff Confirmation (public, token-based) ────────────────────────
+// GET /api/staff-confirm?token=xxx — returns staff name, camp, and schedule
+app.get('/api/staff-confirm', async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) return res.status(400).json({ error: 'Token required' });
+    const rows = await query(`
+      SELECT sc.confirmed, sc.confirmed_at, sc.camp, sc.staff_id,
+             s.name, s.email,
+             r.day, r.shift, r.confirmed_shift
+      FROM staff_confirmations sc
+      JOIN staff s ON sc.staff_id = s.id
+      JOIN requests r ON r.staff_id = sc.staff_id AND r.camp = sc.camp AND r.status = 'confirmed'
+      WHERE sc.token = $1
+      ORDER BY r.day
+    `, [token]);
+    if (!rows.length) return res.status(404).json({ error: 'Invalid or expired link' });
+    const { confirmed, confirmed_at, camp, name, email } = rows[0];
+    const schedule = rows.map(r => ({ day: r.day, shift: r.confirmed_shift || r.shift }));
+    res.json({ name, email, camp, confirmed, confirmed_at, schedule });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/staff-confirm — staff confirms their schedule
+app.post('/api/staff-confirm', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token required' });
+    const rows = await query('SELECT id FROM staff_confirmations WHERE token = $1', [token]);
+    if (!rows.length) return res.status(404).json({ error: 'Invalid or expired link' });
+    await query(
+      'UPDATE staff_confirmations SET confirmed = TRUE, confirmed_at = NOW() WHERE token = $1',
+      [token]
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET /api/admin/confirmations — all staff confirmation statuses
+app.get('/api/admin/confirmations', requireAdmin, async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT sc.staff_id, sc.camp, sc.confirmed, sc.confirmed_at, sc.email_sent_at, s.name, s.email
+      FROM staff_confirmations sc
+      JOIN staff s ON sc.staff_id = s.id
+      ORDER BY sc.camp, s.name
+    `);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/admin/resend-confirmation — resend confirmation email for a staff+camp
+app.post('/api/admin/resend-confirmation', requireAdmin, async (req, res) => {
+  try {
+    const { staff_id, camp } = req.body;
+    const staffRows = await query('SELECT name, email FROM staff WHERE id = $1', [staff_id]);
+    if (!staffRows.length) return res.status(404).json({ error: 'Staff not found' });
+    const { name, email } = staffRows[0];
+    const token = uuidv4();
+    if (IS_PG) {
+      await query(`
+        INSERT INTO staff_confirmations (staff_id, camp, token, email_sent_at)
+        VALUES ($1, $2, $3, NOW())
+        ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, confirmed = FALSE, confirmed_at = NULL, email_sent_at = NOW()
+      `, [staff_id, camp, token]);
+    }
+    sendConfirmationEmail(name, email, camp, token).catch(e => console.error('Email error:', e));
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── Start ─────────────────────────────────────────────────

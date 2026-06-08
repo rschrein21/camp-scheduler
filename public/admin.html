@@ -228,9 +228,13 @@ function switchTab(tab) {
 }
 
 async function load() {
-  const [sr, cr] = await Promise.all([fetch('/api/admin/submissions'), fetch('/api/admin/camps')]);
+  const [sr, cr, cnr] = await Promise.all([fetch('/api/admin/submissions'), fetch('/api/admin/camps'), fetch('/api/admin/confirmations')]);
   data.staff = await sr.json();
   data.camps = await cr.json();
+  data.confirmations = cnr.ok ? await cnr.json() : [];
+  // Index confirmations by staff_id + camp
+  data.confirmMap = {};
+  data.confirmations.forEach(c => { data.confirmMap[`${c.staff_id}|${c.camp}`] = c; });
   renderCamps(); renderStaff(); renderDailySummary();
 }
 
@@ -357,12 +361,20 @@ function renderCamps() {
           <th>Rating</th>
           ${DAYS.map(d => `<th>${d}</th>`).join('')}
           <th>Status</th>
+          <th>Staff Confirmed</th>
         </tr></thead><tbody>`;
       staffArr.forEach(s => {
         const dval = dropdownVal(s.overallStatus, s);
         const dclass = dropdownClass(dval);
         const safecamp = campName.replace(/'/g, "\\'");
         const detailId = `detail-${s.staff_id}-${campName.replace(/[^a-z0-9]/gi,'_')}`;
+        const conf = (data.confirmMap || {})[`${s.staff_id}|${campName}`];
+        const staffConfirmedBadge = !conf
+          ? `<span style="color:#bbb;font-size:0.75rem">—</span>`
+          : conf.confirmed
+            ? `<span style="color:#1a7a3a;font-weight:700;font-size:0.78rem">✅ Confirmed</span>`
+            : `<span style="color:#e07000;font-size:0.75rem">⏳ Awaiting</span>
+               <button onclick="resendConfirmation(${s.staff_id},'${safecamp}')" style="margin-left:4px;padding:2px 7px;background:#fff8e8;border:1px solid #f0c060;border-radius:4px;font-size:0.72rem;cursor:pointer">Resend</button>`;
         html += `<tr>
           <td class="name-col">
             <strong>${s.name}</strong><br>
@@ -387,9 +399,10 @@ function renderCamps() {
             </select>
             <button class="detail-btn" onclick="toggleDetails('${detailId}')">Details ▾</button>
           </td>
+          <td style="white-space:nowrap">${staffConfirmedBadge}</td>
         </tr>
         <tr id="${detailId}" class="detail-row" style="display:none">
-          <td colspan="${DAYS.length + 4}">
+          <td colspan="${DAYS.length + 5}">
             <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
               ${DAYS.map(d => {
                 const day = s.days[d];
@@ -572,6 +585,15 @@ function renderStaff(sortBy = 'priority') {
   });
 
   document.getElementById('staffView').innerHTML = html;
+}
+
+async function resendConfirmation(staffId, camp) {
+  const r = await fetch('/api/admin/resend-confirmation', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ staff_id: staffId, camp })
+  });
+  if (r.ok) alert('Confirmation email resent!');
+  else alert('Failed to resend. Is email configured?');
 }
 
 async function updateStatus(staffId, camp, select) {
