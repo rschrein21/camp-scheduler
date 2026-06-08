@@ -139,6 +139,10 @@
           <select id="assignDirSelect" style="padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem">
             <option value="">Select Director…</option>
           </select>
+          <select id="assignRoleSelect" style="padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem">
+            <option value="skills">Skills Director</option>
+            <option value="admin">Admin Director</option>
+          </select>
           <select id="assignCampSelect" style="padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem">
             <option value="">Select Camp…</option>
             <option>June 15–19 · Seattle University</option>
@@ -628,13 +632,14 @@ async function loadDirectors() {
 function renderDirectors() {
   const { directors, assignments } = directorsData;
 
-  // Directors list
+  // Directors list — exclude Rich Schreiner (he's the admin, doesn't need to appear here)
+  const visibleDirectors = directors.filter(d => d.name.toLowerCase() !== 'rich schreiner');
   let dHtml = `<table class="sched" style="margin-bottom:8px">
     <thead><tr><th class="name-col">Name</th><th>Email</th><th style="width:80px">Action</th></tr></thead><tbody>`;
-  if (!directors.length) {
+  if (!visibleDirectors.length) {
     dHtml += `<tr><td colspan="3" style="text-align:center;color:#bbb;padding:16px">No directors added yet</td></tr>`;
   } else {
-    directors.forEach(d => {
+    visibleDirectors.forEach(d => {
       dHtml += `<tr>
         <td class="name-col"><strong>${d.name}</strong></td>
         <td style="font-size:0.8rem;color:#888">${d.email || '—'}</td>
@@ -645,7 +650,7 @@ function renderDirectors() {
   dHtml += `</tbody></table>`;
   document.getElementById('directorsList').innerHTML = dHtml;
 
-  // Populate director select
+  // Populate director select (all directors including Rich for assignment purposes)
   const sel = document.getElementById('assignDirSelect');
   const cur = sel.value;
   sel.innerHTML = '<option value="">Select Director…</option>';
@@ -656,7 +661,7 @@ function renderDirectors() {
     sel.appendChild(opt);
   });
 
-  // Assignments list — show ALL camps, even unassigned
+  // Assignments — per-camp table with Skills Director and Admin Director columns
   const allCampNames = [
     'June 15\u201319 \u00b7 Seattle University','June 22\u201326 \u00b7 Seattle University','June 22\u201326 \u00b7 West Seattle Del Ridge',
     'July 6\u201310 \u00b7 Seattle University','July 6\u201310 \u00b7 Lower Woodland','July 6\u201310 \u00b7 Kirkland',
@@ -666,30 +671,32 @@ function renderDirectors() {
     'Aug 10\u201314 \u00b7 Lower Woodland','Aug 10\u201314 \u00b7 Issaquah',
     'Aug 17\u201321 \u00b7 West Seattle Del Ridge','Aug 17\u201321 \u00b7 Bellevue'
   ];
-  const assignByCamp = {};
+  // Index assignments by camp+role — exclude Rich Schreiner from display
+  const assignByKey = {}; // camp+'|skills' or camp+'|admin'
   assignments.forEach(a => {
-    if (!assignByCamp[a.camp]) assignByCamp[a.camp] = [];
-    assignByCamp[a.camp].push(a);
+    if (a.director_name.toLowerCase() === 'rich schreiner') return;
+    assignByKey[`${a.camp}|${a.role || 'skills'}`] = a;
   });
+
   let aHtml = `<table class="sched">
-    <thead><tr><th>Camp</th><th>Director</th><th style="width:80px">Action</th></tr></thead><tbody>`;
+    <thead><tr>
+      <th>Camp</th>
+      <th>Skills Director</th>
+      <th style="width:70px"></th>
+      <th>Admin Director</th>
+      <th style="width:70px"></th>
+    </tr></thead><tbody>`;
   allCampNames.forEach(camp => {
-    const campAssignments = assignByCamp[camp] || [];
-    if (campAssignments.length) {
-      campAssignments.forEach(a => {
-        aHtml += `<tr>
-          <td style="font-size:0.82rem">${camp}</td>
-          <td><strong>${a.director_name}</strong></td>
-          <td><button onclick="removeAssignment(${a.id})" style="padding:4px 10px;background:#fff0f0;color:#aa0000;border:1px solid #ffb3b3;border-radius:5px;font-size:0.78rem;cursor:pointer">Remove</button></td>
-        </tr>`;
-      });
-    } else {
-      aHtml += `<tr style="background:#fffbe8">
-        <td style="font-size:0.82rem">${camp}</td>
-        <td style="color:#bbb;font-style:italic;font-size:0.82rem">— unassigned —</td>
-        <td></td>
-      </tr>`;
-    }
+    const skillsA = assignByKey[`${camp}|skills`];
+    const adminA  = assignByKey[`${camp}|admin`];
+    const anyMissing = !skillsA || !adminA;
+    aHtml += `<tr${anyMissing ? ' style="background:#fffbe8"' : ''}>
+      <td style="font-size:0.82rem">${camp}</td>
+      <td>${skillsA ? `<strong>${skillsA.director_name}</strong>` : '<span style="color:#bbb;font-style:italic;font-size:0.82rem">— unassigned —</span>'}</td>
+      <td>${skillsA ? `<button onclick="removeAssignment(${skillsA.id})" style="padding:3px 8px;background:#fff0f0;color:#aa0000;border:1px solid #ffb3b3;border-radius:5px;font-size:0.75rem;cursor:pointer">Remove</button>` : ''}</td>
+      <td>${adminA  ? `<strong>${adminA.director_name}</strong>`  : '<span style="color:#bbb;font-style:italic;font-size:0.82rem">— unassigned —</span>'}</td>
+      <td>${adminA  ? `<button onclick="removeAssignment(${adminA.id})"  style="padding:3px 8px;background:#fff0f0;color:#aa0000;border:1px solid #ffb3b3;border-radius:5px;font-size:0.75rem;cursor:pointer">Remove</button>` : ''}</td>
+    </tr>`;
   });
   aHtml += `</tbody></table>`;
   document.getElementById('assignmentsList').innerHTML = aHtml;
@@ -750,11 +757,12 @@ async function removeDirector(id) {
 
 async function assignDirector() {
   const director_id = document.getElementById('assignDirSelect').value;
+  const role = document.getElementById('assignRoleSelect').value;
   const camp = document.getElementById('assignCampSelect').value;
   if (!director_id || !camp) return alert('Select a director and camp');
   const r = await fetch('/api/admin/director-assignments', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ director_id: parseInt(director_id), camp })
+    body: JSON.stringify({ director_id: parseInt(director_id), camp, role })
   });
   if (!r.ok) { const e = await r.json(); return alert(e.error || 'Error'); }
   await loadDirectors();

@@ -91,6 +91,15 @@ if (IS_PG) {
     // Migrations: add columns that may be missing from tables created before schema updates
     await pool.query(`ALTER TABLE directors ADD COLUMN IF NOT EXISTS phone TEXT`);
     await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS confirmed_shift TEXT`);
+    await pool.query(`ALTER TABLE director_assignments ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'skills'`);
+    // Replace unique(director_id, camp) with unique(camp, role) so one person can hold different roles across camps
+    await pool.query(`ALTER TABLE director_assignments DROP CONSTRAINT IF EXISTS director_assignments_director_id_camp_key`);
+    await pool.query(`
+      DO $$ BEGIN
+        ALTER TABLE director_assignments ADD CONSTRAINT director_assignments_camp_role_key UNIQUE (camp, role);
+      EXCEPTION WHEN duplicate_table THEN NULL;
+      END $$;
+    `);
   }};
 } else {
   const Database = require('better-sqlite3');
@@ -690,10 +699,10 @@ app.delete('/api/admin/directors/:id', requireAdmin, async (req, res) => {
 app.get('/api/admin/director-assignments', requireAdmin, async (req, res) => {
   try {
     const rows = await query(`
-      SELECT da.id, da.camp, da.director_id, d.name as director_name
+      SELECT da.id, da.camp, da.director_id, da.role, d.name as director_name
       FROM director_assignments da
       JOIN directors d ON da.director_id = d.id
-      ORDER BY da.camp, d.name
+      ORDER BY da.camp, da.role
     `);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
@@ -701,16 +710,17 @@ app.get('/api/admin/director-assignments', requireAdmin, async (req, res) => {
 
 app.post('/api/admin/director-assignments', requireAdmin, async (req, res) => {
   try {
-    const { director_id, camp } = req.body;
+    const { director_id, camp, role } = req.body;
+    const safeRole = (role === 'admin' || role === 'skills') ? role : 'skills';
     if (IS_PG) {
       await query(`
-        INSERT INTO director_assignments (director_id, camp) VALUES ($1,$2)
-        ON CONFLICT (director_id, camp) DO NOTHING
-      `, [director_id, camp]);
+        INSERT INTO director_assignments (director_id, camp, role) VALUES ($1,$2,$3)
+        ON CONFLICT (camp, role) DO UPDATE SET director_id = EXCLUDED.director_id
+      `, [director_id, camp, safeRole]);
     } else {
       await query(`
-        INSERT OR IGNORE INTO director_assignments (director_id, camp) VALUES ($1,$2)
-      `, [director_id, camp]);
+        INSERT OR REPLACE INTO director_assignments (director_id, camp, role) VALUES ($1,$2,$3)
+      `, [director_id, camp, safeRole]);
     }
     res.json({ ok: true });
   } catch (err) {
