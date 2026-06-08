@@ -110,11 +110,13 @@
   </header>
   <div class="tabs">
     <div class="tab active" onclick="switchTab('camps')">By Camp</div>
+    <div class="tab" onclick="switchTab('daily')">Daily Summary</div>
     <div class="tab" onclick="switchTab('staff')">By Staff</div>
     <div class="tab" onclick="switchTab('directors')">Directors</div>
   </div>
   <div class="content">
     <div id="campsView"></div>
+    <div id="dailySummaryView" style="display:none"></div>
     <div id="staffView" style="display:none"></div>
     <div id="directorsView" style="display:none">
       <div class="directors-section">
@@ -206,9 +208,10 @@ async function logout() { await fetch('/api/admin/logout', {method:'POST'}); loc
 
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach((t,i) => {
-    t.classList.toggle('active', (['camps','staff','directors'][i]) === tab);
+    t.classList.toggle('active', (['camps','daily','staff','directors'][i]) === tab);
   });
   document.getElementById('campsView').style.display = tab==='camps' ? '' : 'none';
+  document.getElementById('dailySummaryView').style.display = tab==='daily' ? '' : 'none';
   document.getElementById('staffView').style.display = tab==='staff' ? '' : 'none';
   document.getElementById('directorsView').style.display = tab==='directors' ? '' : 'none';
   if (tab === 'directors') loadDirectors();
@@ -218,7 +221,7 @@ async function load() {
   const [sr, cr] = await Promise.all([fetch('/api/admin/submissions'), fetch('/api/admin/camps')]);
   data.staff = await sr.json();
   data.camps = await cr.json();
-  renderCamps(); renderStaff();
+  renderCamps(); renderStaff(); renderDailySummary();
 }
 
 function dayBadge(shift, cancelled) {
@@ -408,6 +411,79 @@ function renderCamps() {
     html += `</div>`;
   });
   document.getElementById('campsView').innerHTML = html || '<div class="empty">No submissions yet.</div>';
+}
+
+function renderDailySummary() {
+  const campOrder = [
+    'June 15\u201319 \u00b7 Seattle University',
+    'June 22\u201326 \u00b7 Seattle University',
+    'June 22\u201326 \u00b7 West Seattle Del Ridge',
+    'July 6\u201310 \u00b7 Seattle University',
+    'July 6\u201310 \u00b7 Lower Woodland',
+    'July 6\u201310 \u00b7 Kirkland',
+    'July 13\u201317 \u00b7 Seattle University',
+    'July 13\u201317 \u00b7 West Seattle Hiawatha',
+    'July 13\u201317 \u00b7 Issaquah',
+    'July 20\u201324 \u00b7 Seattle University',
+    'July 20\u201324 \u00b7 West Seattle Del Ridge',
+    'July 20\u201324 \u00b7 Bothell',
+    'Aug 3\u20137 \u00b7 Washington Park',
+    'Aug 3\u20137 \u00b7 Bellevue',
+    'Aug 10\u201314 \u00b7 Lower Woodland',
+    'Aug 10\u201314 \u00b7 Issaquah',
+    'Aug 17\u201321 \u00b7 West Seattle Del Ridge',
+    'Aug 17\u201321 \u00b7 Bellevue',
+  ];
+
+  // Build per-camp, per-day, per-staff unique map
+  // key: camp → day → staff_id → effective shift
+  const campDayStaff = {};
+  data.camps.forEach(row => {
+    if (!campDayStaff[row.camp]) campDayStaff[row.camp] = {};
+    if (!campDayStaff[row.camp][row.day]) campDayStaff[row.camp][row.day] = {};
+    const eff = row.confirmed_shift || row.shift;
+    // A staff_id may appear in multiple rows for the same day/camp (shouldn't normally happen)
+    // Keep the most permissive shift (full > am/pm)
+    const existing = campDayStaff[row.camp][row.day][row.staff_id];
+    if (!existing || eff === 'full' || (eff !== 'full' && !existing)) {
+      campDayStaff[row.camp][row.day][row.staff_id] = eff;
+    }
+  });
+
+  let html = '<div style="padding:16px">';
+  campOrder.forEach(campName => {
+    const dayMap = campDayStaff[campName];
+    if (!dayMap) return;
+    const need = CAMP_NEEDS[campName] || {am:0, pm:0};
+    html += `<div class="camp-section">
+      <div class="camp-hdr"><h3>${campName}</h3></div>
+      <table class="sched" style="margin-bottom:0">
+        <thead><tr>
+          <th style="text-align:left;width:100px">Day</th>
+          <th>AM Staff<br><span style="font-weight:400;color:#999;font-size:0.7rem">(AM + Full)</span></th>
+          <th>PM Staff<br><span style="font-weight:400;color:#999;font-size:0.7rem">(PM + Full)</span></th>
+          <th>Need AM</th>
+          <th>Need PM</th>
+        </tr></thead><tbody>`;
+    DAYS.forEach(day => {
+      const staffOnDay = dayMap[day] || {};
+      const shifts = Object.values(staffOnDay);
+      const amCount = shifts.filter(s => s === 'am' || s === 'full').length;
+      const pmCount = shifts.filter(s => s === 'pm' || s === 'full').length;
+      const amOk = amCount >= need.am;
+      const pmOk = pmCount >= need.pm;
+      html += `<tr>
+        <td style="text-align:left;font-weight:600">${day}</td>
+        <td><span class="conf-count ${amOk ? 'conf-ok' : 'conf-short'}" style="font-size:1rem;font-weight:700">${amCount}</span></td>
+        <td><span class="conf-count ${pmOk ? 'conf-ok' : 'conf-short'}" style="font-size:1rem;font-weight:700">${pmCount}</span></td>
+        <td style="color:#888">${need.am}</td>
+        <td style="color:#888">${need.pm}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  });
+  html += '</div>';
+  document.getElementById('dailySummaryView').innerHTML = html;
 }
 
 function renderStaff(sortBy = 'priority') {
