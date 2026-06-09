@@ -32,6 +32,7 @@ async function sendConfirmationEmail(staffName, staffEmail, camp, token) {
         <a href="${link}" style="background:#111;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:700;font-size:1rem">View &amp; Confirm My Schedule</a>
       </p>
       <p style="color:#888;font-size:0.85rem">Or copy this link: ${link}</p>
+      <p style="color:#555;font-size:0.9rem"><em>Note: This confirmation is for <strong>${camp}</strong> only. You may be assigned to additional camps — you'll receive a separate email for each one.</em></p>
       <p>Questions? Reply to this email or contact Rich directly.</p>
       <p>Thanks,<br>Rich Schreiner<br>Nike Soccer Camps</p>
     `
