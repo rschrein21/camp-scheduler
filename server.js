@@ -787,7 +787,9 @@ app.patch('/api/admin/staff/:id', requireAdmin, async (req, res) => {
 app.delete('/api/admin/staff/:id', requireAdmin, async (req, res) => {
   try {
     const id = req.params.id;
+    await query('DELETE FROM staff_confirmations WHERE staff_id = $1', [id]);
     await query('DELETE FROM hours_worked WHERE staff_id = $1', [id]);
+    await query('DELETE FROM requests WHERE staff_id = $1', [id]);
     await query('DELETE FROM staff WHERE id = $1', [id]);
     res.json({ ok: true });
   } catch (err) { console.error(err); res.status(500).json({ error: err.message }); }
