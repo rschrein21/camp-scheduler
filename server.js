@@ -136,11 +136,11 @@ if (IS_PG) {
         UNIQUE(staff_id, camp)
       )
     `);
-    // Replace unique(director_id, camp) with unique(camp, role) so one person can hold different roles across camps
-    await pool.query(`ALTER TABLE director_assignments DROP CONSTRAINT IF EXISTS director_assignments_director_id_camp_key`);
+    // Allow multiple directors per camp per role — drop camp+role unique, enforce director+camp unique
+    await pool.query(`ALTER TABLE director_assignments DROP CONSTRAINT IF EXISTS director_assignments_camp_role_key`);
     await pool.query(`
       DO $$ BEGIN
-        ALTER TABLE director_assignments ADD CONSTRAINT director_assignments_camp_role_key UNIQUE (camp, role);
+        ALTER TABLE director_assignments ADD CONSTRAINT director_assignments_director_id_camp_key UNIQUE (director_id, camp);
       EXCEPTION WHEN duplicate_table THEN NULL;
       END $$;
     `);
@@ -776,7 +776,7 @@ app.post('/api/admin/director-assignments', requireAdmin, async (req, res) => {
     if (IS_PG) {
       await query(`
         INSERT INTO director_assignments (director_id, camp, role) VALUES ($1,$2,$3)
-        ON CONFLICT (camp, role) DO UPDATE SET director_id = EXCLUDED.director_id
+        ON CONFLICT (director_id, camp) DO UPDATE SET role = EXCLUDED.role
       `, [director_id, camp, safeRole]);
     } else {
       await query(`

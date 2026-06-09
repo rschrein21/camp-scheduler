@@ -727,31 +727,32 @@ function renderDirectors() {
     'Aug 10\u201314 \u00b7 Lower Woodland','Aug 10\u201314 \u00b7 Issaquah',
     'Aug 17\u201321 \u00b7 West Seattle Del Ridge','Aug 17\u201321 \u00b7 Bellevue'
   ];
-  // Index assignments by camp+role — exclude Rich Schreiner from display
-  const assignByKey = {}; // camp+'|skills' or camp+'|admin'
+  // Group assignments by camp — exclude Rich Schreiner from display
+  const assignByCamp = {};
   assignments.forEach(a => {
     if (a.director_name.toLowerCase() === 'rich schreiner') return;
-    assignByKey[`${a.camp}|${a.role || 'skills'}`] = a;
+    if (!assignByCamp[a.camp]) assignByCamp[a.camp] = [];
+    assignByCamp[a.camp].push(a);
   });
 
   let aHtml = `<table class="sched">
     <thead><tr>
       <th>Camp</th>
-      <th>Skills Director</th>
-      <th style="width:70px"></th>
-      <th>Admin Director</th>
-      <th style="width:70px"></th>
+      <th>Skills Directors</th>
+      <th>Admin Directors</th>
     </tr></thead><tbody>`;
   allCampNames.forEach(camp => {
-    const skillsA = assignByKey[`${camp}|skills`];
-    const adminA  = assignByKey[`${camp}|admin`];
-    const anyMissing = !skillsA || !adminA;
+    const campAssign = assignByCamp[camp] || [];
+    const skillsList = campAssign.filter(a => (a.role || 'skills') === 'skills');
+    const adminList  = campAssign.filter(a => a.role === 'admin');
+    const anyMissing = !skillsList.length || !adminList.length;
+    const renderList = (list) => list.length
+      ? list.map(a => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><strong style="font-size:0.83rem">${a.director_name}</strong><button onclick="removeAssignment(${a.id})" style="padding:2px 7px;background:#fff0f0;color:#aa0000;border:1px solid #ffb3b3;border-radius:5px;font-size:0.72rem;cursor:pointer">✕</button></div>`).join('')
+      : '<span style="color:#bbb;font-style:italic;font-size:0.82rem">— unassigned —</span>';
     aHtml += `<tr${anyMissing ? ' style="background:#fffbe8"' : ''}>
       <td style="font-size:0.82rem">${camp}</td>
-      <td>${skillsA ? `<strong>${skillsA.director_name}</strong>` : '<span style="color:#bbb;font-style:italic;font-size:0.82rem">— unassigned —</span>'}</td>
-      <td>${skillsA ? `<button onclick="removeAssignment(${skillsA.id})" style="padding:3px 8px;background:#fff0f0;color:#aa0000;border:1px solid #ffb3b3;border-radius:5px;font-size:0.75rem;cursor:pointer">Remove</button>` : ''}</td>
-      <td>${adminA  ? `<strong>${adminA.director_name}</strong>`  : '<span style="color:#bbb;font-style:italic;font-size:0.82rem">— unassigned —</span>'}</td>
-      <td>${adminA  ? `<button onclick="removeAssignment(${adminA.id})"  style="padding:3px 8px;background:#fff0f0;color:#aa0000;border:1px solid #ffb3b3;border-radius:5px;font-size:0.75rem;cursor:pointer">Remove</button>` : ''}</td>
+      <td>${renderList(skillsList)}</td>
+      <td>${renderList(adminList)}</td>
     </tr>`;
   });
   aHtml += `</tbody></table>`;
