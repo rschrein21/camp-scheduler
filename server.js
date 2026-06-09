@@ -757,6 +757,40 @@ app.delete('/api/admin/directors/:id', requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
+app.patch('/api/admin/directors/:id', requireAdmin, async (req, res) => {
+  try {
+    const { name, email, phone } = req.body;
+    await query(`UPDATE directors SET
+      name  = COALESCE($1, name),
+      email = COALESCE($2, email),
+      phone = COALESCE($3, phone)
+      WHERE id = $4`, [name||null, email||null, phone||null, req.params.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.patch('/api/admin/staff/:id', requireAdmin, async (req, res) => {
+  try {
+    const { name, email, phone, shirt_size, shorts_size, address } = req.body;
+    await query(`UPDATE staff SET
+      name        = COALESCE($1, name),
+      email       = COALESCE($2, email),
+      phone       = COALESCE($3, phone),
+      shirt_size  = COALESCE($4, shirt_size),
+      shorts_size = COALESCE($5, shorts_size),
+      address     = COALESCE($6, address)
+      WHERE id = $7`, [name||null, email||null, phone||null, shirt_size||null, shorts_size||null, address||null, req.params.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.delete('/api/admin/staff/:id', requireAdmin, async (req, res) => {
+  try {
+    await query('DELETE FROM staff WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
 app.get('/api/admin/director-assignments', requireAdmin, async (req, res) => {
   try {
     const rows = await query(`
