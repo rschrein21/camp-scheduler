@@ -875,6 +875,40 @@ app.get('/api/admin/confirmations', requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
+// POST /api/admin/send-all-confirmations — bulk send confirmation emails to all confirmed staff
+app.post('/api/admin/send-all-confirmations', requireAdmin, async (req, res) => {
+  try {
+    // Get all confirmed staff+camp combos
+    const rows = await query(`
+      SELECT DISTINCT r.staff_id, r.camp, s.name, s.email
+      FROM requests r
+      JOIN staff s ON r.staff_id = s.id
+      WHERE r.status = 'confirmed'
+      ORDER BY r.camp, s.name
+    `);
+    if (!rows.length) return res.json({ ok: true, sent: 0, message: 'No confirmed staff found' });
+    let sent = 0;
+    let errors = [];
+    for (const row of rows) {
+      try {
+        const token = uuidv4();
+        if (IS_PG) {
+          await query(`
+            INSERT INTO staff_confirmations (staff_id, camp, token, email_sent_at)
+            VALUES ($1, $2, $3, NOW())
+            ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, confirmed = FALSE, confirmed_at = NULL, email_sent_at = NOW()
+          `, [row.staff_id, row.camp, token]);
+        }
+        await sendConfirmationEmail(row.name, row.email, row.camp, token);
+        sent++;
+      } catch (e) {
+        errors.push(`${row.name} / ${row.camp}: ${e.message}`);
+      }
+    }
+    res.json({ ok: true, sent, total: rows.length, errors });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
 // POST /api/admin/resend-confirmation — resend confirmation email for a staff+camp
 app.post('/api/admin/resend-confirmation', requireAdmin, async (req, res) => {
   try {

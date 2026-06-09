@@ -120,6 +120,11 @@
     <div class="tab" onclick="switchTab('staff')">By Staff</div>
     <div class="tab" onclick="switchTab('directors')">Directors</div>
   </div>
+  <div style="background:#fff8e8;border-bottom:1px solid #f0c060;padding:10px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-size:0.85rem;color:#7a5c00">📧 <strong>Confirmation Emails</strong></span>
+    <button onclick="sendAllConfirmations()" style="padding:6px 14px;background:#f0c060;border:none;border-radius:6px;font-size:0.83rem;font-weight:600;cursor:pointer">Send All Confirmation Emails</button>
+    <span id="confirmBulkStatus" style="font-size:0.8rem;color:#555"></span>
+  </div>
   <div class="content">
     <div id="campsView"></div>
     <div id="dailySummaryView" style="display:none"></div>
@@ -585,6 +590,31 @@ function renderStaff(sortBy = 'priority') {
   });
 
   document.getElementById('staffView').innerHTML = html;
+}
+
+async function sendAllConfirmations() {
+  const btn = event.target;
+  const status = document.getElementById('confirmBulkStatus');
+  if (!confirm('Send confirmation emails to ALL currently confirmed staff? This will send one email per confirmed camp per staff member.')) return;
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+  status.textContent = '';
+  try {
+    const r = await fetch('/api/admin/send-all-confirmations', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const d = await r.json();
+    if (r.ok) {
+      status.textContent = `✅ Sent ${d.sent} of ${d.total} emails${d.errors?.length ? ` (${d.errors.length} failed)` : ''}`;
+      status.style.color = '#2a7a2a';
+    } else {
+      status.textContent = `❌ Error: ${d.error}`;
+      status.style.color = '#cc0000';
+    }
+  } catch(e) {
+    status.textContent = '❌ Network error';
+    status.style.color = '#cc0000';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Send All Confirmation Emails';
 }
 
 async function resendConfirmation(staffId, camp) {
