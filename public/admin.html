@@ -122,7 +122,13 @@
   </div>
   <div style="background:#fff8e8;border-bottom:1px solid #f0c060;padding:10px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     <span style="font-size:0.85rem;color:#7a5c00">📧 <strong>Confirmation Emails</strong></span>
-    <button onclick="sendAllConfirmations()" style="padding:6px 14px;background:#f0c060;border:none;border-radius:6px;font-size:0.83rem;font-weight:600;cursor:pointer">Send All Confirmation Emails</button>
+    <select id="confirmCampFilter" style="padding:5px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.83rem">
+      <option value="">All Camps</option>
+      <option value="June 15–19 · Seattle University" selected>June 15–19 · Seattle University</option>
+      <option value="June 22–26 · Seattle University">June 22–26 · Seattle University</option>
+      <option value="June 22–26 · West Seattle Del Ridge">June 22–26 · West Seattle Del Ridge</option>
+    </select>
+    <button onclick="sendAllConfirmations()" style="padding:6px 14px;background:#f0c060;border:none;border-radius:6px;font-size:0.83rem;font-weight:600;cursor:pointer">Send Confirmation Emails</button>
     <span id="confirmBulkStatus" style="font-size:0.8rem;color:#555"></span>
   </div>
   <div class="content">
@@ -590,12 +596,15 @@ function renderStaff(sortBy = 'priority') {
 async function sendAllConfirmations() {
   const btn = event.target;
   const status = document.getElementById('confirmBulkStatus');
-  if (!confirm('Send confirmation emails to ALL currently confirmed staff? This will send one email per confirmed camp per staff member.')) return;
+  const campFilter = document.getElementById('confirmCampFilter').value;
+  const label = campFilter || 'ALL camps';
+  if (!confirm(`Send confirmation emails for ${label}? This will send one email per confirmed staff member.`)) return;
   btn.disabled = true;
   btn.textContent = 'Sending...';
   status.textContent = '';
   try {
-    const r = await fetch('/api/admin/send-all-confirmations', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const body = campFilter ? JSON.stringify({ camp: campFilter }) : '{}';
+    const r = await fetch('/api/admin/send-all-confirmations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
     const d = await r.json();
     if (r.ok) {
       status.textContent = `✅ Sent ${d.sent} of ${d.total} emails${d.errors?.length ? ` (${d.errors.length} failed)` : ''}`;

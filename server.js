@@ -879,14 +879,23 @@ app.get('/api/admin/confirmations', requireAdmin, async (req, res) => {
 // POST /api/admin/send-all-confirmations — bulk send confirmation emails to all confirmed staff
 app.post('/api/admin/send-all-confirmations', requireAdmin, async (req, res) => {
   try {
-    // Get all confirmed staff+camp combos
-    const rows = await query(`
-      SELECT DISTINCT r.staff_id, r.camp, s.name, s.email
-      FROM requests r
-      JOIN staff s ON r.staff_id = s.id
-      WHERE r.status = 'confirmed'
-      ORDER BY r.camp, s.name
-    `);
+    const { camp: campFilter } = req.body || {};
+    // Get confirmed staff+camp combos, optionally filtered by camp
+    const rows = campFilter
+      ? await query(`
+          SELECT DISTINCT r.staff_id, r.camp, s.name, s.email
+          FROM requests r
+          JOIN staff s ON r.staff_id = s.id
+          WHERE r.status = 'confirmed' AND r.camp = $1
+          ORDER BY s.name
+        `, [campFilter])
+      : await query(`
+          SELECT DISTINCT r.staff_id, r.camp, s.name, s.email
+          FROM requests r
+          JOIN staff s ON r.staff_id = s.id
+          WHERE r.status = 'confirmed'
+          ORDER BY r.camp, s.name
+        `);
     if (!rows.length) return res.json({ ok: true, sent: 0, message: 'No confirmed staff found' });
     let sent = 0;
     let errors = [];
