@@ -786,9 +786,11 @@ app.patch('/api/admin/staff/:id', requireAdmin, async (req, res) => {
 
 app.delete('/api/admin/staff/:id', requireAdmin, async (req, res) => {
   try {
-    await query('DELETE FROM staff WHERE id = $1', [req.params.id]);
+    const id = req.params.id;
+    await query('DELETE FROM hours_worked WHERE staff_id = $1', [id]);
+    await query('DELETE FROM staff WHERE id = $1', [id]);
     res.json({ ok: true });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error(err); res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/admin/director-assignments', requireAdmin, async (req, res) => {
