@@ -151,8 +151,8 @@
             <option value="">Select Director…</option>
           </select>
           <select id="assignRoleSelect" style="padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem">
-            <option value="skills">Skills Director</option>
-            <option value="admin">Admin Director</option>
+            <option value="skills">Skills Director (8am–4pm)</option>
+            <option value="admin">Admin Director (7:45am–3:45pm)</option>
           </select>
           <select id="assignCampSelect" style="padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem">
             <option value="">Select Camp…</option>
@@ -738,8 +738,8 @@ function renderDirectors() {
   let aHtml = `<table class="sched">
     <thead><tr>
       <th>Camp</th>
-      <th>Skills Directors</th>
-      <th>Admin Directors</th>
+      <th>Skills Directors (8am–4pm)</th>
+      <th>Admin Directors (7:45am–3:45pm)</th>
     </tr></thead><tbody>`;
   allCampNames.forEach(camp => {
     const campAssign = assignByCamp[camp] || [];

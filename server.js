@@ -20,6 +20,15 @@ function shiftLabel(shift) {
   }
 }
 
+// Director role labels
+function directorRoleLabel(role) {
+  switch ((role || '').toLowerCase()) {
+    case 'admin':  return 'Admin Director (7:45am–3:45pm)';
+    case 'skills': return 'Skills Director (8am–4pm)';
+    default:       return role || 'Director';
+  }
+}
+
 // ── Email transport (Resend, with nodemailer fallback) ───────────
 const GMAIL_USER = process.env.GMAIL_USER || 'rich.seattlesoccer@gmail.com';
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || '';
