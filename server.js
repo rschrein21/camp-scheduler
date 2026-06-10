@@ -10,34 +10,60 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'nikesoccer2025';
 const DIRECTOR_PASSWORD = process.env.DIRECTOR_PASSWORD || 'director2026';
 const BASE_URL = process.env.BASE_URL || 'https://camp-scheduler-tg11.onrender.com';
 
-// ── Email transport ──────────────────────────────────────
+// ── Email transport (Resend, with nodemailer fallback) ───────────
 const GMAIL_USER = process.env.GMAIL_USER || 'rich.seattlesoccer@gmail.com';
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || '';
-const emailTransport = GMAIL_APP_PASSWORD ? nodemailer.createTransport({
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const RESEND_FROM = process.env.RESEND_FROM || 'Nike Soccer Camps <noreply@coachrichsoccer.com>';
+
+// Prefer Resend; fall back to nodemailer if Resend not configured
+let resendClient = null;
+if (RESEND_API_KEY) {
+  try {
+    const { Resend } = require('resend');
+    resendClient = new Resend(RESEND_API_KEY);
+    console.log('Resend email configured ✓');
+  } catch (e) { console.warn('Resend load error:', e.message); }
+}
+const emailTransport = (!resendClient && GMAIL_APP_PASSWORD) ? nodemailer.createTransport({
   service: 'gmail',
   auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD }
 }) : null;
 
 async function sendConfirmationEmail(staffName, staffEmail, camp, token) {
-  if (!emailTransport) { console.warn('Email not configured — skipping email'); return false; }
   const link = `${BASE_URL}/staff-confirm?token=${token}`;
-  await emailTransport.sendMail({
-    from: `"Nike Soccer Camps" <${GMAIL_USER}>`,
-    to: staffEmail,
-    subject: `Please confirm your schedule — ${camp}`,
-    html: `
-      <p>Hi ${staffName},</p>
-      <p>Your schedule for <strong>${camp}</strong> has been set. Please click the button below to confirm you'll be there.</p>
-      <p style="margin:24px 0">
-        <a href="${link}" style="background:#111;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:700;font-size:1rem">View &amp; Confirm My Schedule</a>
-      </p>
-      <p style="color:#888;font-size:0.85rem">Or copy this link: ${link}</p>
-      <p style="color:#555;font-size:0.9rem"><em>Note: This confirmation is for <strong>${camp}</strong> only. You may be assigned to additional camps — you'll receive a separate email for each one.</em></p>
-      <p>Questions? Reply to this email or contact Rich directly.</p>
-      <p>Thanks,<br>Rich Schreiner<br>Nike Soccer Camps</p>
-    `
-  });
-  return true;
+  const html = `
+    <p>Hi ${staffName},</p>
+    <p>Your schedule for <strong>${camp}</strong> has been set. Please click the button below to confirm you'll be there.</p>
+    <p style="margin:24px 0">
+      <a href="${link}" style="background:#111;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:700;font-size:1rem">View &amp; Confirm My Schedule</a>
+    </p>
+    <p style="color:#888;font-size:0.85rem">Or copy this link: ${link}</p>
+    <p style="color:#555;font-size:0.9rem"><em>Note: This confirmation is for <strong>${camp}</strong> only. You may be assigned to additional camps — you'll receive a separate email for each one.</em></p>
+    <p>Questions? Reply to this email or contact Rich directly.</p>
+    <p>Thanks,<br>Rich Schreiner<br>Nike Soccer Camps</p>
+  `;
+  if (resendClient) {
+    const { error } = await resendClient.emails.send({
+      from: RESEND_FROM,
+      to: staffEmail,
+      subject: `Please confirm your schedule — ${camp}`,
+      html
+    });
+    if (error) throw new Error(`Resend error: ${error.message}`);
+    return true;
+  } else if (emailTransport) {
+    await emailTransport.sendMail({
+      from: `"Nike Soccer Camps" <${GMAIL_USER}>`,
+      to: staffEmail,
+      subject: `Please confirm your schedule — ${camp}`,
+      html
+    });
+    return true;
+  } else {
+    console.warn('No email transport configured — skipping email');
+    return false;
+  }
 }
 
 // ── Twilio SMS transport ──────────────────────────────────
