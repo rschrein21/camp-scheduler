@@ -905,7 +905,7 @@ app.post('/api/staff-confirm', async (req, res) => {
 app.get('/api/admin/confirmations', requireAdmin, async (req, res) => {
   try {
     const rows = await query(`
-      SELECT sc.staff_id, sc.camp, sc.confirmed, sc.confirmed_at, sc.email_sent_at, s.name, s.email
+      SELECT sc.staff_id, sc.camp, sc.confirmed, sc.confirmed_at, sc.email_sent_at, sc.token, s.name, s.email
       FROM staff_confirmations sc
       JOIN staff s ON sc.staff_id = s.id
       ORDER BY sc.camp, s.name
