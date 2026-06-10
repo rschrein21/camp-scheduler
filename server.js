@@ -1082,6 +1082,35 @@ app.post('/api/admin/resend-confirmation', requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
+// GET /api/admin/pending-sms — confirmed staff with no SMS sent yet (phone required)
+app.get('/api/admin/pending-sms', requireAdmin, async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT sc.staff_id, sc.camp, sc.token, s.name, s.phone
+      FROM staff_confirmations sc
+      JOIN staff s ON sc.staff_id = s.id
+      WHERE sc.email_sent_at IS NOT NULL
+        AND sc.sms_sent_at IS NULL
+        AND s.phone IS NOT NULL
+        AND s.phone != ''
+      ORDER BY sc.camp, s.name
+    `);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/admin/mark-sms-sent — mark SMS as sent for a staff+camp
+app.post('/api/admin/mark-sms-sent', requireAdmin, async (req, res) => {
+  try {
+    const { staff_id, camp } = req.body;
+    await query(
+      'UPDATE staff_confirmations SET sms_sent_at = NOW() WHERE staff_id = $1 AND camp = $2',
+      [staff_id, camp]
+    );
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
 // ── Start ─────────────────────────────────────────────────
 const PORT = process.env.PORT || 3579;
 db.init().then(() => {
