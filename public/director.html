@@ -266,7 +266,7 @@ function renderRoster() {
           const shift = s.days[d];
           if (!shift) return `<td class="center"><span class="day-badge db-none">—</span></td>`;
           const cls = shift === 'full' ? 'db-full' : shift === 'am' ? 'db-am' : 'db-pm';
-          const label = shift === 'full' ? 'Full' : shift.toUpperCase();
+          const label = shift === 'full' ? 'Full Day (8am–4pm)' : shift === 'am' ? 'AM (8am–12pm)' : shift === 'pm' ? 'PM (12pm–4pm)' : shift.toUpperCase();
           return `<td class="center"><span class="day-badge ${cls}">${label}</span></td>`;
         }).join('')}
       </tr>`;

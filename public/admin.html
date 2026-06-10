@@ -252,8 +252,8 @@ async function load() {
 function dayBadge(shift, cancelled) {
   if (cancelled) return `<span class="day-badge db-cancelled">Cancelled</span>`;
   if (!shift) return `<span class="day-badge db-none">—</span>`;
-  if (shift === 'full') return `<span class="day-badge db-full">Full</span>`;
-  if (shift === 'am')   return `<span class="day-badge db-am">AM</span>`;
+  if (shift === 'full') return `<span class="day-badge db-full">Full Day (8am–4pm)</span>`;
+  if (shift === 'am')   return `<span class="day-badge db-am">AM (8am–12pm)</span>`;
   return `<span class="day-badge db-pm">PM</span>`;
 }
 
@@ -580,7 +580,7 @@ function renderStaff(sortBy = 'priority') {
           ${DAYS.map(d => {
             const sh = days[d];
             if (!sh) return '';
-            return `<span class="dp dp-${sh}"><strong>${d}:</strong> ${sh==='full'?'Full':sh.toUpperCase()}</span>`;
+            const shiftTime = sh==='full'?'Full Day (8am–4pm)':sh==='am'?'AM (8am–12pm)':sh==='pm'?'PM (12pm–4pm)':sh.toUpperCase(); return `<span class="dp dp-${sh}"><strong>${d}:</strong> ${shiftTime}</span>`;
           }).join('')}
         </div>
       </div>`;
