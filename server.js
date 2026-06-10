@@ -19,7 +19,7 @@ const emailTransport = GMAIL_APP_PASSWORD ? nodemailer.createTransport({
 }) : null;
 
 async function sendConfirmationEmail(staffName, staffEmail, camp, token) {
-  if (!emailTransport) { console.warn('Email not configured — skipping send'); return; }
+  if (!emailTransport) { console.warn('Email not configured — skipping email'); return false; }
   const link = `${BASE_URL}/staff-confirm?token=${token}`;
   await emailTransport.sendMail({
     from: `"Nike Soccer Camps" <${GMAIL_USER}>`,
@@ -37,6 +37,61 @@ async function sendConfirmationEmail(staffName, staffEmail, camp, token) {
       <p>Thanks,<br>Rich Schreiner<br>Nike Soccer Camps</p>
     `
   });
+  return true;
+}
+
+// ── Twilio SMS transport ──────────────────────────────────
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || '';
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || '';
+const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER || '';
+let twilioClient = null;
+if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_FROM_NUMBER) {
+  try {
+    const twilio = require('twilio');
+    twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+    console.log('Twilio SMS configured ✓');
+  } catch (e) {
+    console.warn('Twilio load error:', e.message);
+  }
+}
+
+async function sendConfirmationSMS(staffPhone, camp, token) {
+  if (!twilioClient || !staffPhone) return false;
+  const link = `${BASE_URL}/staff-confirm?token=${token}`;
+  // Normalize to E.164
+  const digits = staffPhone.replace(/\D/g, '');
+  const e164 = digits.length === 10 ? `+1${digits}` : `+${digits}`;
+  await twilioClient.messages.create({
+    body: `Nike Soccer Camps: You're confirmed for ${camp}. View & confirm your schedule: ${link}`,
+    from: TWILIO_FROM_NUMBER,
+    to: e164
+  });
+  return true;
+}
+
+// SMS-first: try SMS, always send email as backup
+async function sendConfirmationNotification(staffName, staffEmail, staffPhone, camp, token) {
+  const result = { smsSent: false, emailSent: false };
+  // 1. SMS (primary)
+  if (staffPhone && twilioClient) {
+    try {
+      result.smsSent = await sendConfirmationSMS(staffPhone, camp, token);
+    } catch (e) {
+      console.error('SMS error:', e.message);
+    }
+  }
+  // 2. Email (always send as backup / for record-keeping)
+  if (staffEmail) {
+    try {
+      result.emailSent = await sendConfirmationEmail(staffName, staffEmail, camp, token);
+    } catch (e) {
+      console.error('Email error:', e.message);
+    }
+  }
+  if (!result.smsSent && !result.emailSent) {
+    console.warn(`No notification sent for ${staffName} / ${camp} — no SMS config and no email transport`);
+  }
+  return result;
 }
 
 // ── Database setup ────────────────────────────────────────
@@ -133,9 +188,11 @@ if (IS_PG) {
         confirmed BOOLEAN NOT NULL DEFAULT FALSE,
         confirmed_at TIMESTAMP,
         email_sent_at TIMESTAMP,
+        sms_sent_at TIMESTAMP,
         UNIQUE(staff_id, camp)
       )
     `);
+    await pool.query(`ALTER TABLE staff_confirmations ADD COLUMN IF NOT EXISTS sms_sent_at TIMESTAMP`);
     // Allow multiple directors per camp per role — drop camp+role unique, enforce director+camp unique
     await pool.query(`ALTER TABLE director_assignments DROP CONSTRAINT IF EXISTS director_assignments_camp_role_key`);
     await pool.query(`
@@ -587,20 +644,27 @@ app.post('/api/admin/status', requireAdmin, async (req, res) => {
         [status, confirmed_shift || null, staff_id, camp]
       );
 
-      // When confirming: generate/send confirmation email token
+      // When confirming: generate/send confirmation (SMS-first, email backup)
       if (status === 'confirmed') {
-        const staffRows = await query('SELECT name, email FROM staff WHERE id = $1', [staff_id]);
-        if (staffRows.length && staffRows[0].email) {
-          const { name, email } = staffRows[0];
+        const staffRows = await query('SELECT name, email, phone FROM staff WHERE id = $1', [staff_id]);
+        if (staffRows.length) {
+          const { name, email, phone } = staffRows[0];
           const token = uuidv4();
           if (IS_PG) {
             await query(`
-              INSERT INTO staff_confirmations (staff_id, camp, token, email_sent_at)
-              VALUES ($1, $2, $3, NOW())
-              ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, confirmed = FALSE, confirmed_at = NULL, email_sent_at = NOW()
+              INSERT INTO staff_confirmations (staff_id, camp, token, email_sent_at, sms_sent_at)
+              VALUES ($1, $2, $3, NULL, NULL)
+              ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, confirmed = FALSE, confirmed_at = NULL, email_sent_at = NULL, sms_sent_at = NULL
             `, [staff_id, camp, token]);
           }
-          sendConfirmationEmail(name, email, camp, token).catch(e => console.error('Email error:', e));
+          sendConfirmationNotification(name, email, phone, camp, token).then(async ({ smsSent, emailSent }) => {
+            if (IS_PG) {
+              await query(
+                'UPDATE staff_confirmations SET email_sent_at = CASE WHEN $1 THEN NOW() ELSE email_sent_at END, sms_sent_at = CASE WHEN $2 THEN NOW() ELSE sms_sent_at END WHERE staff_id = $3 AND camp = $4',
+                [emailSent, smsSent, staff_id, camp]
+              );
+            }
+          }).catch(e => console.error('Notification error:', e));
         }
       }
 
@@ -905,7 +969,7 @@ app.post('/api/staff-confirm', async (req, res) => {
 app.get('/api/admin/confirmations', requireAdmin, async (req, res) => {
   try {
     const rows = await query(`
-      SELECT sc.staff_id, sc.camp, sc.confirmed, sc.confirmed_at, sc.email_sent_at, sc.token, s.name, s.email
+      SELECT sc.staff_id, sc.camp, sc.confirmed, sc.confirmed_at, sc.email_sent_at, sc.sms_sent_at, sc.token, s.name, s.email, s.phone
       FROM staff_confirmations sc
       JOIN staff s ON sc.staff_id = s.id
       ORDER BY sc.camp, s.name
@@ -921,39 +985,47 @@ app.post('/api/admin/send-all-confirmations', requireAdmin, async (req, res) => 
     // Get confirmed staff+camp combos, optionally filtered by camp
     const rows = campFilter
       ? await query(`
-          SELECT DISTINCT r.staff_id, r.camp, s.name, s.email
+          SELECT DISTINCT r.staff_id, r.camp, s.name, s.email, s.phone
           FROM requests r
           JOIN staff s ON r.staff_id = s.id
           WHERE r.status = 'confirmed' AND r.camp = $1
           ORDER BY s.name
         `, [campFilter])
       : await query(`
-          SELECT DISTINCT r.staff_id, r.camp, s.name, s.email
+          SELECT DISTINCT r.staff_id, r.camp, s.name, s.email, s.phone
           FROM requests r
           JOIN staff s ON r.staff_id = s.id
           WHERE r.status = 'confirmed'
           ORDER BY r.camp, s.name
         `);
     if (!rows.length) return res.json({ ok: true, sent: 0, message: 'No confirmed staff found' });
-    let sent = 0;
+    let sent = 0, smsSent = 0, emailSent = 0;
     let errors = [];
     for (const row of rows) {
       try {
         const token = uuidv4();
         if (IS_PG) {
           await query(`
-            INSERT INTO staff_confirmations (staff_id, camp, token, email_sent_at)
-            VALUES ($1, $2, $3, NOW())
-            ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, confirmed = FALSE, confirmed_at = NULL, email_sent_at = NOW()
+            INSERT INTO staff_confirmations (staff_id, camp, token, email_sent_at, sms_sent_at)
+            VALUES ($1, $2, $3, NULL, NULL)
+            ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, confirmed = FALSE, confirmed_at = NULL, email_sent_at = NULL, sms_sent_at = NULL
           `, [row.staff_id, row.camp, token]);
         }
-        await sendConfirmationEmail(row.name, row.email, row.camp, token);
+        const result = await sendConfirmationNotification(row.name, row.email, row.phone, row.camp, token);
+        if (IS_PG) {
+          await query(
+            'UPDATE staff_confirmations SET email_sent_at = CASE WHEN $1 THEN NOW() ELSE email_sent_at END, sms_sent_at = CASE WHEN $2 THEN NOW() ELSE sms_sent_at END WHERE staff_id = $3 AND camp = $4',
+            [result.emailSent, result.smsSent, row.staff_id, row.camp]
+          );
+        }
+        if (result.smsSent) smsSent++;
+        if (result.emailSent) emailSent++;
         sent++;
       } catch (e) {
         errors.push(`${row.name} / ${row.camp}: ${e.message}`);
       }
     }
-    res.json({ ok: true, sent, total: rows.length, errors });
+    res.json({ ok: true, sent, smsSent, emailSent, total: rows.length, errors });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -961,18 +1033,25 @@ app.post('/api/admin/send-all-confirmations', requireAdmin, async (req, res) => 
 app.post('/api/admin/resend-confirmation', requireAdmin, async (req, res) => {
   try {
     const { staff_id, camp } = req.body;
-    const staffRows = await query('SELECT name, email FROM staff WHERE id = $1', [staff_id]);
+    const staffRows = await query('SELECT name, email, phone FROM staff WHERE id = $1', [staff_id]);
     if (!staffRows.length) return res.status(404).json({ error: 'Staff not found' });
-    const { name, email } = staffRows[0];
+    const { name, email, phone } = staffRows[0];
     const token = uuidv4();
     if (IS_PG) {
       await query(`
-        INSERT INTO staff_confirmations (staff_id, camp, token, email_sent_at)
-        VALUES ($1, $2, $3, NOW())
-        ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, confirmed = FALSE, confirmed_at = NULL, email_sent_at = NOW()
+        INSERT INTO staff_confirmations (staff_id, camp, token, email_sent_at, sms_sent_at)
+        VALUES ($1, $2, $3, NULL, NULL)
+        ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, confirmed = FALSE, confirmed_at = NULL, email_sent_at = NULL, sms_sent_at = NULL
       `, [staff_id, camp, token]);
     }
-    sendConfirmationEmail(name, email, camp, token).catch(e => console.error('Email error:', e));
+    sendConfirmationNotification(name, email, phone, camp, token).then(async ({ smsSent, emailSent }) => {
+      if (IS_PG) {
+        await query(
+          'UPDATE staff_confirmations SET email_sent_at = CASE WHEN $1 THEN NOW() ELSE email_sent_at END, sms_sent_at = CASE WHEN $2 THEN NOW() ELSE sms_sent_at END WHERE staff_id = $3 AND camp = $4',
+          [emailSent, smsSent, staff_id, camp]
+        );
+      }
+    }).catch(e => console.error('Notification error:', e));
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });

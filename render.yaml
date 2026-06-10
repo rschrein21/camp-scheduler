@@ -15,6 +15,12 @@ services:
         value: rich.seattlesoccer@gmail.com
       - key: GMAIL_APP_PASSWORD
         value: guiplunclnwnqqby
+      - key: TWILIO_ACCOUNT_SID
+        value: ""
+      - key: TWILIO_AUTH_TOKEN
+        value: ""
+      - key: TWILIO_FROM_NUMBER
+        value: ""
 
 databases:
   - name: camp-scheduler-db
