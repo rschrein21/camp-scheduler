@@ -15,7 +15,7 @@ function shiftLabel(shift) {
   switch ((shift || '').toLowerCase()) {
     case 'am':   return 'AM (8am–12pm)';
     case 'pm':   return 'PM (12pm–4pm)';
-    case 'full': return 'Full Day (8am–4pm)';
+    case 'full': return 'Full Day (8:20am–3:20pm)';
     default:     return shift || '';
   }
 }

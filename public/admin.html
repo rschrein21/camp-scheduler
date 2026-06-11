@@ -249,12 +249,19 @@ async function load() {
   renderCamps(); renderStaff(); renderDailySummary();
 }
 
-function dayBadge(shift, cancelled) {
+function shiftLabel(shift, day) {
+  const mon = day === 'Mon';
+  if (shift === 'full') return mon ? 'Full Day (7:50am–3:20pm)' : 'Full Day (8:20am–3:20pm)';
+  if (shift === 'am')   return mon ? 'AM (7:50am–12pm)' : 'AM (8am–12pm)';
+  if (shift === 'pm')   return 'PM (12pm–4pm)';
+  return shift ? shift.toUpperCase() : '—';
+}
+function dayBadge(shift, cancelled, day) {
   if (cancelled) return `<span class="day-badge db-cancelled">Cancelled</span>`;
   if (!shift) return `<span class="day-badge db-none">—</span>`;
-  if (shift === 'full') return `<span class="day-badge db-full">Full Day (8am–4pm)</span>`;
-  if (shift === 'am')   return `<span class="day-badge db-am">AM (8am–12pm)</span>`;
-  return `<span class="day-badge db-pm">PM</span>`;
+  if (shift === 'full') return `<span class="day-badge db-full">${shiftLabel('full', day)}</span>`;
+  if (shift === 'am')   return `<span class="day-badge db-am">${shiftLabel('am', day)}</span>`;
+  return `<span class="day-badge db-pm">${shiftLabel('pm', day)}</span>`;
 }
 
 function effectiveShift(staffEntry) {
@@ -390,10 +397,10 @@ function renderCamps() {
           <td><span class="rating-stars">${'★'.repeat(s.rating)}${'☆'.repeat(5-s.rating)}</span></td>
           ${DAYS.map(d => {
             const day = s.days[d];
-            if (!day) return `<td>${dayBadge(null)}</td>`;
+            if (!day) return `<td>${dayBadge(null, false, d)}</td>`;
             const effShift = day.confirmed_shift || day.shift;
             const cancelled = day.status === 'cancelled';
-            return `<td>${dayBadge(effShift, cancelled)}</td>`;
+            return `<td>${dayBadge(effShift, cancelled, d)}</td>`;
           }).join('')}
           <td>
             <select class="status-select ${dclass}" onchange="updateStatus(${s.staff_id}, '${safecamp}', this)">
@@ -420,7 +427,7 @@ function renderCamps() {
                   : '';
                 return `<tr>
                   <td style="width:50px;font-weight:700">${d}</td>
-                  <td style="width:80px;color:#aaa;font-size:0.75rem">Sub: ${dayBadge(day.shift)}</td>
+                  <td style="width:80px;color:#aaa;font-size:0.75rem">Sub: ${dayBadge(day.shift, false, d)}</td>
                   <td>
                     <select style="padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:0.75rem;cursor:pointer" onchange="setDaySchedule(${day.req_id}, this.value)">
                       <option value=""    ${selCS===''    ?'selected':''}>— None</option>
@@ -580,7 +587,7 @@ function renderStaff(sortBy = 'priority') {
           ${DAYS.map(d => {
             const sh = days[d];
             if (!sh) return '';
-            const shiftTime = sh==='full'?'Full Day (8am–4pm)':sh==='am'?'AM (8am–12pm)':sh==='pm'?'PM (12pm–4pm)':sh.toUpperCase(); return `<span class="dp dp-${sh}"><strong>${d}:</strong> ${shiftTime}</span>`;
+            const shiftTime = shiftLabel(sh, d); return `<span class="dp dp-${sh}"><strong>${d}:</strong> ${shiftTime}</span>`;
           }).join('')}
         </div>
       </div>`;
