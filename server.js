@@ -252,6 +252,7 @@ if (IS_PG) {
     `);
     await pool.query(`ALTER TABLE staff_confirmations ADD COLUMN IF NOT EXISTS sms_sent_at TIMESTAMP`);
     await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE director_availability ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'skills'`);
     // Allow multiple directors per camp per role — drop camp+role unique, enforce director+camp unique
     await pool.query(`ALTER TABLE director_assignments DROP CONSTRAINT IF EXISTS director_assignments_camp_role_key`);
     await pool.query(`
@@ -810,8 +811,9 @@ app.get('/api/director-signup', async (req, res) => {
 // POST /api/director-signup → create/update director + availability
 app.post('/api/director-signup', async (req, res) => {
   try {
-    const { name, email, phone, camps } = req.body;
+    const { name, email, phone, role, camps } = req.body;
     if (!name || !email) return res.status(400).json({ error: 'Name and email required' });
+    const dirRole = role || 'skills';
     // Upsert director: check by email first, then by name (admin may have added without email)
     let directorId;
     let byEmail = await query('SELECT * FROM directors WHERE LOWER(email) = LOWER($1)', [email.trim()]);
@@ -827,14 +829,14 @@ app.post('/api/director-signup', async (req, res) => {
       );
       directorId = rows[0].id;
     }
-    // Replace availability
+    // Replace availability (with role)
     await query('DELETE FROM director_availability WHERE director_id = $1', [directorId]);
     if (camps && camps.length > 0) {
       for (const camp of camps) {
         if (IS_PG) {
-          await query('INSERT INTO director_availability (director_id, camp) VALUES ($1,$2) ON CONFLICT DO NOTHING', [directorId, camp]);
+          await query('INSERT INTO director_availability (director_id, camp, role) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', [directorId, camp, dirRole]);
         } else {
-          await query('INSERT OR IGNORE INTO director_availability (director_id, camp) VALUES ($1,$2)', [directorId, camp]);
+          await query('INSERT OR IGNORE INTO director_availability (director_id, camp, role) VALUES ($1,$2,$3)', [directorId, camp, dirRole]);
         }
       }
     }

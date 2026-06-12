@@ -3,100 +3,144 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nike Soccer Camp — Director Availability</title>
+<title>Nike Soccer Camp — Director Sign Up</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #222; }
-  header { background: #111; color: #fff; padding: 18px 24px; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f0f2; color: #222; }
+  header { background: #111; color: #fff; padding: 20px 24px; }
   header h1 { font-size: 1.2rem; font-weight: 700; }
-  header p { font-size: 0.85rem; opacity: 0.55; margin-top: 3px; }
-  .container { max-width: 680px; margin: 28px auto; padding: 0 14px 60px; }
-  .card { background: #fff; border-radius: 10px; padding: 22px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-  h2 { font-size: 1rem; font-weight: 700; margin-bottom: 16px; }
-  label.field-label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 4px; color: #555; }
-  input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; margin-bottom: 14px; }
-  input:focus { outline: none; border-color: #0066cc; }
+  header p { font-size: 0.82rem; color: #aaa; margin-top: 4px; }
+  .container { max-width: 640px; margin: 0 auto; padding: 24px 14px 60px; }
 
-  .notice { background: #e8f4ff; border: 1px solid #b3d7ff; border-radius: 8px; padding: 13px 16px;
-    font-size: 0.85rem; color: #004499; margin-bottom: 20px; line-height: 1.5; }
+  .card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 18px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); }
+  .card-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #888; margin-bottom: 16px; }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 0.82rem; font-weight: 600; color: #555; margin-bottom: 5px; }
+  .field input, .field select { width: 100%; padding: 11px 13px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.95rem; background: #fff; }
+  .field input:focus, .field select:focus { outline: none; border-color: #0066cc; box-shadow: 0 0 0 3px rgba(0,102,204,0.1); }
+  .field-row { display: flex; gap: 12px; }
+  .field-row .field { flex: 1; }
+
+  /* Role cards */
+  .role-options { display: flex; gap: 10px; flex-wrap: wrap; }
+  .role-card { flex: 1; min-width: 200px; border: 2px solid #e8e8e8; border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: all 0.15s; }
+  .role-card:hover { border-color: #999; }
+  .role-card.selected { border-color: #0066cc; background: #f0f6ff; }
+  .role-card input { display: none; }
+  .role-card .role-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 3px; }
+  .role-card .role-hours { font-size: 0.78rem; color: #888; }
+  .role-card .role-check { float: right; font-size: 1.1rem; display: none; }
+  .role-card.selected .role-check { display: inline; }
 
   /* Lookup bar */
-  .lookup-bar { background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; }
-  .lookup-bar p { font-size: 0.83rem; color: #664d03; margin-bottom: 10px; font-weight: 600; }
+  .lookup-bar { background: #fffbe8; border: 1px solid #f0d060; border-radius: 10px; padding: 14px 16px; margin-bottom: 18px; }
+  .lookup-bar p { font-size: 0.83rem; color: #7a5c00; font-weight: 600; margin-bottom: 10px; }
   .lookup-row { display: flex; gap: 8px; }
-  .lookup-row input { flex: 1; margin-bottom: 0; }
-  .lookup-btn { white-space: nowrap; padding: 10px 16px; background: #f0a500; color: #fff; border: none;
-    border-radius: 6px; font-size: 0.88rem; font-weight: 700; cursor: pointer; }
-  .lookup-btn:hover { background: #cc8800; }
-  .lookup-msg { font-size: 0.8rem; margin-top: 7px; display: none; }
+  .lookup-row input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 7px; font-size: 0.88rem; }
+  .lookup-btn { padding: 10px 16px; background: #d4a017; color: #fff; border: none; border-radius: 7px; font-size: 0.88rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .lookup-msg { font-size: 0.8rem; margin-top: 8px; display: none; }
   .lookup-ok { color: #1a7a3a; } .lookup-err { color: #cc0000; }
-  .edit-banner { display: none; background: #e8f4ff; border: 1px solid #b3d7ff; border-radius: 8px;
-    padding: 11px 16px; font-size: 0.83rem; color: #004499; margin-bottom: 14px; }
 
-  /* Week sections */
-  .week-header { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
-    color: #999; padding: 8px 0 6px; border-bottom: 2px solid #f0f0f0; margin: 22px 0 12px; }
+  /* Week + camp rows */
+  .week-header { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #aaa; padding: 14px 0 8px; border-bottom: 1px solid #f0f0f0; margin-bottom: 10px; }
+  .week-header:first-child { padding-top: 0; }
 
-  /* Camp checkboxes */
-  .camp-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px;
-    border: 1px solid #e8e8e8; border-radius: 8px; margin-bottom: 8px; cursor: pointer;
-    transition: background 0.1s; }
-  .camp-row:hover { background: #f8f8f8; }
-  .camp-row.selected { background: #e8f4ff; border-color: #b3d7ff; }
-  .camp-row input[type=checkbox] { width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: #0066cc; }
-  .camp-name { font-size: 0.9rem; font-weight: 600; color: #222; }
+  .camp-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border: 2px solid #eee; border-radius: 9px; margin-bottom: 7px; cursor: pointer; transition: all 0.12s; user-select: none; }
+  .camp-row:hover { border-color: #bbb; }
+  .camp-row.selected { border-color: #0066cc; background: #f0f6ff; }
+  .camp-row input[type=checkbox] { width: 19px; height: 19px; margin: 0; cursor: pointer; accent-color: #0066cc; flex-shrink: 0; }
+  .camp-row .camp-name { font-size: 0.9rem; font-weight: 600; flex: 1; }
 
-  .submit-btn { width: 100%; background: #111; color: #fff; border: none; padding: 14px;
-    border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 8px; }
+  .submit-btn { width: 100%; background: #111; color: #fff; border: none; padding: 16px; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 6px; transition: background 0.15s; }
   .submit-btn:hover { background: #333; }
+  .submit-btn:disabled { opacity: 0.6; cursor: default; }
 
-  #successMsg { display: none; background: #e8ffee; border: 1px solid #7ed8a0; border-radius: 8px;
-    padding: 22px; text-align: center; font-size: 1rem; font-weight: 600; color: #1a7a3a; margin-top: 20px; }
+  .success-card { display: none; background: #fff; border-radius: 12px; padding: 32px 24px; text-align: center; box-shadow: 0 1px 6px rgba(0,0,0,0.08); }
+  .success-card .check { font-size: 3rem; margin-bottom: 10px; }
+  .success-card h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; color: #1a7a3a; }
+  .success-card p { font-size: 0.88rem; color: #666; }
+  .edit-notice { background: #f0f6ff; border: 1px solid #b3d7ff; border-radius: 8px; padding: 11px 16px; font-size: 0.83rem; color: #004499; margin-bottom: 16px; display: none; }
 </style>
 </head>
 <body>
+
 <header>
-  <h1>⚽ Nike Soccer Camp — Director Availability</h1>
-  <p>Seattle Soccer ID Camps 2026</p>
+  <h1>⚽ Nike Soccer Camp — Director Sign Up</h1>
+  <p>2026 Season — Seattle Soccer ID Camps</p>
 </header>
 
 <div class="container">
-  <div class="card">
-    <div class="notice">
-      Select every camp week you're available to direct. You'll be contacted to confirm your assignment.
-      Already submitted? Load your availability below to update it.
+
+  <div class="lookup-bar">
+    <p>📋 Already signed up? Load your info to make changes.</p>
+    <div class="lookup-row">
+      <input type="email" id="lookupEmail" placeholder="Enter your email address">
+      <button type="button" class="lookup-btn" onclick="loadExisting()">Load My Info</button>
     </div>
-
-    <!-- Lookup -->
-    <div class="lookup-bar">
-      <p>🔄 Already submitted? Load your availability to update it.</p>
-      <div class="lookup-row">
-        <input type="email" id="lookupEmail" placeholder="Enter your email address">
-        <button type="button" class="lookup-btn" onclick="loadExisting()">Load My Availability</button>
-      </div>
-      <div class="lookup-msg lookup-ok" id="lookupOk">✅ Loaded! Make your changes and hit Save below.</div>
-      <div class="lookup-msg lookup-err" id="lookupErr">No submission found for that email.</div>
-    </div>
-
-    <div class="edit-banner" id="editBanner">✏️ Editing availability for <strong id="editName"></strong></div>
-
-    <form id="dirForm">
-      <h2>Your Info</h2>
-      <label class="field-label">Full Name *</label>
-      <input type="text" name="name" required placeholder="Jane Smith">
-      <label class="field-label">Email *</label>
-      <input type="email" name="email" required placeholder="jane@example.com">
-      <label class="field-label">Phone</label>
-      <input type="tel" name="phone" placeholder="(206) 555-0100">
-
-      <h2>Camp Availability</h2>
-      <p style="font-size:0.83rem;color:#888;margin-bottom:14px">Check every camp week you're available to direct.</p>
-      <div id="campList"></div>
-
-      <button type="submit" class="submit-btn">Submit My Availability →</button>
-    </form>
-    <div id="successMsg">✅ Submitted! We'll be in touch to confirm your assignment.</div>
+    <div class="lookup-msg lookup-ok" id="lookupOk">✅ Loaded! Make your changes and resubmit below.</div>
+    <div class="lookup-msg lookup-err" id="lookupErr">No submission found for that email.</div>
   </div>
+
+  <div class="edit-notice" id="editNotice">✏️ Editing info for <strong id="editName"></strong></div>
+
+  <form id="dirForm">
+
+    <!-- Personal Info -->
+    <div class="card">
+      <div class="card-title">Your Info</div>
+      <div class="field-row">
+        <div class="field">
+          <label>First &amp; Last Name *</label>
+          <input type="text" name="name" required placeholder="Jane Smith">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Email *</label>
+          <input type="email" name="email" required placeholder="jane@example.com">
+        </div>
+        <div class="field">
+          <label>Phone</label>
+          <input type="tel" name="phone" placeholder="(206) 555-0100">
+        </div>
+      </div>
+    </div>
+
+    <!-- Role -->
+    <div class="card">
+      <div class="card-title">Your Director Role</div>
+      <div class="role-options">
+        <label class="role-card selected" id="role-skills-card">
+          <input type="radio" name="role" value="skills" checked onchange="updateRoleCards()">
+          <span class="role-check">✅</span>
+          <div class="role-title">Skills Director</div>
+          <div class="role-hours">8:00am – 4:00pm</div>
+        </label>
+        <label class="role-card" id="role-admin-card">
+          <input type="radio" name="role" value="admin" onchange="updateRoleCards()">
+          <span class="role-check">✅</span>
+          <div class="role-title">Admin Director</div>
+          <div class="role-hours">7:45am – 3:45pm</div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Camp Availability -->
+    <div class="card">
+      <div class="card-title">Camp Availability — check every week you can direct</div>
+      <div id="campList"></div>
+    </div>
+
+    <button type="submit" class="submit-btn" id="submitBtn">Submit My Availability →</button>
+  </form>
+
+  <div class="success-card" id="successCard">
+    <div class="check">✅</div>
+    <h2>Submitted!</h2>
+    <p>Thanks! Coach Rich will follow up to confirm your assignment.</p>
+  </div>
+
 </div>
 
 <script>
@@ -144,6 +188,11 @@ CAMPS.forEach((camp, ci) => {
   campList.appendChild(row);
 });
 
+function updateRoleCards() {
+  document.getElementById('role-skills-card').classList.toggle('selected', document.querySelector('[name=role][value=skills]').checked);
+  document.getElementById('role-admin-card').classList.toggle('selected', document.querySelector('[name=role][value=admin]').checked);
+}
+
 async function loadExisting() {
   const email = document.getElementById('lookupEmail').value.trim();
   if (!email) return;
@@ -151,25 +200,21 @@ async function loadExisting() {
   document.getElementById('lookupErr').style.display = 'none';
 
   const res = await fetch('/api/director-signup?email=' + encodeURIComponent(email));
-  if (!res.ok) {
-    document.getElementById('lookupErr').style.display = 'block';
-    return;
-  }
+  if (!res.ok) { document.getElementById('lookupErr').style.display = 'block'; return; }
   const { director, camps } = await res.json();
 
   document.querySelector('[name=name]').value  = director.name || '';
   document.querySelector('[name=email]').value = director.email || '';
   document.querySelector('[name=phone]').value = director.phone || '';
 
-  // Reset checkboxes then apply saved
   document.querySelectorAll('input[name=camps]').forEach(cb => {
     cb.checked = camps.includes(cb.value);
     cb.closest('.camp-row').classList.toggle('selected', cb.checked);
   });
 
-  document.getElementById('editBanner').style.display = 'block';
+  document.getElementById('editNotice').style.display = 'block';
   document.getElementById('editName').textContent = director.name;
-  document.querySelector('.submit-btn').textContent = 'Save Changes →';
+  document.getElementById('submitBtn').textContent = 'Save Changes →';
   document.getElementById('lookupOk').style.display = 'block';
   document.getElementById('lookupEmail').value = '';
   document.getElementById('dirForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -177,25 +222,41 @@ async function loadExisting() {
 
 document.getElementById('dirForm').addEventListener('submit', async e => {
   e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
   const fd = new FormData(e.target);
   const camps = [...document.querySelectorAll('input[name=camps]:checked')].map(cb => cb.value);
+  if (camps.length === 0) {
+    alert('Please select at least one camp week you can direct.');
+    btn.disabled = false;
+    btn.textContent = 'Submit My Availability →';
+    return;
+  }
+
   const body = {
-    name: fd.get('name'),
+    name:  fd.get('name'),
     email: fd.get('email'),
     phone: fd.get('phone'),
+    role:  fd.get('role'),
     camps
   };
+
   const res = await fetch('/api/director-signup', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
   const data = await res.json();
   if (data.ok) {
-    e.target.style.display = 'none';
-    document.getElementById('successMsg').style.display = 'block';
+    document.getElementById('dirForm').style.display = 'none';
+    document.querySelector('.lookup-bar').style.display = 'none';
+    document.getElementById('editNotice').style.display = 'none';
+    document.getElementById('successCard').style.display = 'block';
   } else {
     alert('Error: ' + (data.error || 'Unknown error'));
+    btn.disabled = false;
+    btn.textContent = 'Submit My Availability →';
   }
 });
 </script>
