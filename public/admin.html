@@ -904,7 +904,7 @@ function renderOpenShifts(openShifts) {
             <span style="color:#f0a500;font-size:0.75rem;margin-left:6px">${stars(sub.rating)}</span>
             ${sub.phone ? `<span style="color:#888;font-size:0.78rem;margin-left:8px">${sub.phone}</span>` : ''}
           </div>
-          <button onclick="fillShift(${slot.req_id}, ${sub.staff_id}, '${slot.camp.replace(/'/g, &quot;\\&apos;&quot;)}', '${slot.day}', '${shift}', this)" 
+          <button onclick="fillShift(${slot.req_id}, ${sub.staff_id}, ${JSON.stringify(slot.camp)}, '${slot.day}', '${shift}', this)" 
             style="padding:6px 14px;background:#0066cc;color:#fff;border:none;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer;white-space:nowrap">
             Assign
           </button>
