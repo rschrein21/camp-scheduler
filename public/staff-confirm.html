@@ -6,30 +6,50 @@
 <title>Confirm Your Schedule — Nike Soccer Camps</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f0f2; color: #222; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-  .card { background: #fff; border-radius: 14px; box-shadow: 0 2px 16px rgba(0,0,0,0.1); max-width: 480px; width: 100%; padding: 32px 28px; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f0f2; color: #222; min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px; }
+  .card { background: #fff; border-radius: 14px; box-shadow: 0 2px 16px rgba(0,0,0,0.1); max-width: 500px; width: 100%; padding: 28px 24px; }
   .logo { font-size: 2rem; text-align: center; margin-bottom: 6px; }
-  h1 { font-size: 1.2rem; font-weight: 700; text-align: center; margin-bottom: 4px; }
-  .subtitle { font-size: 0.85rem; color: #888; text-align: center; margin-bottom: 24px; }
-  .camp-badge { background: #111; color: #fff; border-radius: 20px; padding: 6px 16px; font-size: 0.85rem; font-weight: 700; display: inline-block; margin-bottom: 20px; }
-  .schedule-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-  .schedule-table th { text-align: left; font-size: 0.75rem; font-weight: 600; color: #888; padding: 6px 10px; border-bottom: 1px solid #eee; }
-  .schedule-table td { padding: 10px; border-bottom: 1px solid #f5f5f5; font-size: 0.9rem; }
-  .schedule-table tr:last-child td { border-bottom: none; }
-  .shift-badge { display: inline-block; font-size: 0.75rem; font-weight: 700; padding: 3px 10px; border-radius: 10px; }
-  .shift-full { background: #dbeafe; color: #1d4ed8; }
-  .shift-am   { background: #fef3c7; color: #92400e; }
-  .shift-pm   { background: #ede9fe; color: #5b21b6; }
-  .confirm-btn { width: 100%; background: #1a7a3a; color: #fff; border: none; border-radius: 8px; padding: 16px; font-size: 1.05rem; font-weight: 700; cursor: pointer; transition: background 0.15s; }
-  .confirm-btn:hover:not(:disabled) { background: #155f2e; }
-  .confirm-btn:disabled { opacity: 0.6; cursor: default; }
-  .already-confirmed { text-align: center; background: #f0faf4; border: 1px solid #a7d7b5; border-radius: 10px; padding: 20px; }
-  .already-confirmed .check { font-size: 2.5rem; margin-bottom: 8px; }
-  .already-confirmed p { color: #1a7a3a; font-weight: 700; font-size: 1rem; }
-  .already-confirmed small { color: #888; font-size: 0.8rem; }
-  .error-state { text-align: center; color: #cc3300; padding: 20px; }
+  h1 { font-size: 1.15rem; font-weight: 700; text-align: center; margin-bottom: 4px; }
+  .subtitle { font-size: 0.85rem; color: #888; text-align: center; margin-bottom: 20px; }
+  .camp-badge { background: #111; color: #fff; border-radius: 20px; padding: 6px 16px; font-size: 0.85rem; font-weight: 700; display: inline-block; margin-bottom: 18px; }
+  .instruction { font-size: 0.86rem; color: #555; margin-bottom: 16px; line-height: 1.5; background: #f8f8f8; border-radius: 8px; padding: 12px 14px; }
+
+  /* Day rows */
+  .day-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 2px solid #eee; border-radius: 10px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.15s, background 0.15s; user-select: none; }
+  .day-row.checked { border-color: #1a7a3a; background: #f0faf4; }
+  .day-row.assigned-orig { border-color: #0066cc; background: #f0f6ff; }
+  .day-row.assigned-orig.checked { border-color: #1a7a3a; background: #f0faf4; }
+  .day-row:hover { border-color: #999; }
+
+  .day-check input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; accent-color: #1a7a3a; flex-shrink: 0; }
+  .day-info { flex: 1; }
+  .day-name { font-weight: 700; font-size: 0.95rem; }
+  .day-meta { font-size: 0.75rem; color: #888; margin-top: 2px; }
+  .assigned-tag { display: inline-block; background: #0066cc; color: #fff; border-radius: 6px; padding: 1px 6px; font-size: 0.68rem; font-weight: 700; margin-left: 6px; vertical-align: middle; }
+  .new-tag { display: inline-block; background: #7c3aed; color: #fff; border-radius: 6px; padding: 1px 6px; font-size: 0.68rem; font-weight: 700; margin-left: 6px; vertical-align: middle; }
+
+  .shift-select { padding: 7px 10px; border: 1px solid #ddd; border-radius: 7px; font-size: 0.82rem; cursor: pointer; min-width: 140px; background: #fff; }
+  .shift-hidden { visibility: hidden; pointer-events: none; }
+
+  .submit-btn { width: 100%; background: #1a7a3a; color: #fff; border: none; border-radius: 10px; padding: 16px; font-size: 1.05rem; font-weight: 700; cursor: pointer; margin-top: 18px; transition: background 0.15s; }
+  .submit-btn:hover:not(:disabled) { background: #155f2e; }
+  .submit-btn:disabled { opacity: 0.6; cursor: default; }
+  .note { font-size: 0.78rem; color: #aaa; text-align: center; margin-top: 14px; line-height: 1.5; }
+
+  /* Success state */
+  .success-box { background: #f0faf4; border: 1px solid #a7d7b5; border-radius: 10px; padding: 20px; text-align: center; margin-top: 4px; }
+  .success-box .check { font-size: 2.5rem; margin-bottom: 8px; }
+  .success-box h2 { color: #1a7a3a; font-size: 1rem; margin-bottom: 6px; }
+  .success-box p { font-size: 0.85rem; color: #555; }
+  .summary-list { text-align: left; margin: 14px 0 0; font-size: 0.85rem; }
+  .summary-list li { padding: 4px 0; list-style: none; }
+
+  /* Already confirmed view */
+  .update-link { display: inline-block; margin-top: 14px; padding: 10px 20px; background: #f0f0f0; color: #444; border-radius: 8px; font-size: 0.85rem; font-weight: 600; text-decoration: none; border: 1px solid #ddd; cursor: pointer; }
+  .update-link:hover { background: #e4e4e4; }
+
   .loading { text-align: center; color: #888; padding: 40px; font-size: 0.9rem; }
-  .hi-name { font-weight: 700; }
+  .error-state { text-align: center; color: #cc3300; padding: 20px; }
 </style>
 </head>
 <body>
@@ -40,105 +60,185 @@
 <script>
 const params = new URLSearchParams(location.search);
 const token = params.get('token');
+const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+const DAY_LABELS = { Mon:'Monday', Tue:'Tuesday', Wed:'Wednesday', Thu:'Thursday', Fri:'Friday' };
+let schedData = null;
+let showingForm = false;
 
 async function load() {
   const card = document.getElementById('card');
   if (!token) {
-    card.innerHTML = '<div class="error-state">❌ Invalid link. Please check your email for the correct link.</div>';
+    card.innerHTML = '<div class="error-state">❌ Invalid link. Check your email for the correct link.</div>';
     return;
   }
-
   const r = await fetch(`/api/staff-confirm?token=${encodeURIComponent(token)}`);
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
     card.innerHTML = `<div class="error-state">❌ ${e.error || 'Invalid or expired link'}</div>`;
     return;
   }
-
-  const { name, camp, confirmed, confirmed_at, schedule } = await r.json();
-
-  const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
-  const orderedSchedule = [...schedule].sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day));
-
-  const shiftLabel = s => s === 'full' ? 'Full Day' : s === 'am' ? 'AM Only' : 'PM Only';
-  const shiftClass = s => s === 'full' ? 'shift-full' : s === 'am' ? 'shift-am' : 'shift-pm';
-
-  const scheduleRows = orderedSchedule.map(d => `
-    <tr>
-      <td><strong>${d.day}</strong></td>
-      <td><span class="shift-badge ${shiftClass(d.shift)}">${shiftLabel(d.shift)}</span></td>
-    </tr>
-  `).join('');
-
-  if (confirmed) {
-    const confirmedDate = confirmed_at ? new Date(confirmed_at).toLocaleDateString('en-US', {month:'long', day:'numeric'}) : '';
-    card.innerHTML = `
-      <div class="logo">⚽</div>
-      <h1>Schedule Already Confirmed</h1>
-      <div class="subtitle">Nike Soccer Camps</div>
-      <div class="already-confirmed">
-        <div class="check">✅</div>
-        <p>You're confirmed for ${camp}!</p>
-        ${confirmedDate ? `<small>Confirmed on ${confirmedDate}</small>` : ''}
-      </div>
-      <table class="schedule-table" style="margin-top:20px">
-        <thead><tr><th>Day</th><th>Shift</th></tr></thead>
-        <tbody>${scheduleRows}</tbody>
-      </table>
-      <div style="margin-top:18px;text-align:center">
-        <a href="/staff-manage?token=${encodeURIComponent(token)}" style="display:inline-block;padding:10px 20px;background:#f5f5f5;color:#555;border-radius:8px;font-size:0.85rem;font-weight:600;text-decoration:none;border:1px solid #ddd">⚙️ Need to cancel a shift?</a>
-      </div>
-      <p style="font-size:0.8rem;color:#aaa;text-align:center;margin-top:12px">Questions? Reply to the email from Rich or text 206-605-9954.</p>
-    `;
-    return;
+  schedData = await r.json();
+  if (schedData.confirmed) {
+    renderConfirmedView();
+  } else {
+    renderForm();
   }
+}
 
-  card.innerHTML = `
+function renderConfirmedView() {
+  const { name, camp, confirmed_at, schedule } = schedData;
+  const date = confirmed_at ? new Date(confirmed_at).toLocaleDateString('en-US',{month:'long',day:'numeric'}) : '';
+  const DAYS_ORDER = ['Mon','Tue','Wed','Thu','Fri'];
+  const sorted = [...schedule].sort((a,b) => DAYS_ORDER.indexOf(a.day) - DAYS_ORDER.indexOf(b.day));
+  const sl = s => s==='full'?'Full Day':s==='am'?'AM (8am–12pm)':s==='pm'?'PM (12pm–4pm)':s||'';
+  const rows = sorted.map(s => `<li>✅ ${DAY_LABELS[s.day]} — ${sl(s.shift)}</li>`).join('');
+  document.getElementById('card').innerHTML = `
     <div class="logo">⚽</div>
-    <h1>Confirm Your Schedule</h1>
-    <div class="subtitle">Nike Soccer Camps — please review and confirm below</div>
-    <p style="margin-bottom:14px">Hi <span class="hi-name">${name}</span>,</p>
-    <p style="margin-bottom:16px;font-size:0.9rem;color:#555">Your schedule for the following camp has been set. Please review and click <strong>Confirm</strong> to let us know you'll be there.</p>
-    <div style="text-align:center;margin-bottom:18px"><span class="camp-badge">${camp}</span></div>
-    <table class="schedule-table">
-      <thead><tr><th>Day</th><th>Shift</th></tr></thead>
-      <tbody>${scheduleRows}</tbody>
-    </table>
-    <button class="confirm-btn" id="confirmBtn" onclick="confirm()">✅ Confirm My Schedule</button>
-    <div style="margin-top:14px;text-align:center">
-      <a href="/staff-manage?token=${encodeURIComponent(token)}" style="display:inline-block;padding:10px 20px;background:#f5f5f5;color:#555;border-radius:8px;font-size:0.85rem;font-weight:600;text-decoration:none;border:1px solid #ddd">⚙️ Need to cancel or change a day?</a>
+    <h1>Schedule Confirmed</h1>
+    <div class="subtitle">Nike Soccer Camps</div>
+    <div class="success-box">
+      <div class="check">✅</div>
+      <h2>You're confirmed for ${camp}!</h2>
+      ${date ? `<p style="color:#888;font-size:0.8rem">Submitted on ${date}</p>` : ''}
+      <ul class="summary-list">${rows}</ul>
     </div>
-    <p style="font-size:0.8rem;color:#aaa;text-align:center;margin-top:12px">Questions? Reply to the email from Rich or text 206-605-9954.</p>
+    <div style="text-align:center">
+      <span class="update-link" onclick="renderForm(true)">✏️ Update my availability</span>
+    </div>
+    <p class="note">Need to make a last-minute change? Click above.<br>Questions? Text Rich at 206-605-9954.</p>
   `;
 }
 
-async function confirm() {
-  const btn = document.getElementById('confirmBtn');
-  btn.disabled = true;
-  btn.textContent = 'Confirming…';
+function renderForm(isUpdate) {
+  showingForm = true;
+  const { name, camp, schedule } = schedData;
 
-  const r = await fetch('/api/staff-confirm', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token })
+  // Build map of existing assignments
+  const assigned = {};
+  schedule.forEach(s => { assigned[s.day] = s.shift; });
+
+  const dayRows = DAYS.map(day => {
+    const isAssigned = !!assigned[day];
+    const shift = assigned[day] || 'full';
+    const checked = isAssigned;
+    return `
+      <div class="day-row${checked?' checked':''}${isAssigned?' assigned-orig':''}" id="row-${day}" onclick="toggleDay('${day}')">
+        <div class="day-check">
+          <input type="checkbox" id="chk-${day}" ${checked?'checked':''} onclick="event.stopPropagation();syncRow('${day}')">
+        </div>
+        <div class="day-info">
+          <div class="day-name">${DAY_LABELS[day]}
+            ${isAssigned ? '<span class="assigned-tag">Assigned</span>' : ''}
+          </div>
+          <div class="day-meta" id="meta-${day}">${checked ? (shift==='full'?'Full Day':shift==='am'?'AM Only':'PM Only') : 'Tap to add this day'}</div>
+        </div>
+        <div id="shift-wrap-${day}" ${checked?'':'class="shift-hidden"'}>
+          <select class="shift-select" id="shift-${day}" onclick="event.stopPropagation()" onchange="updateMeta('${day}')">
+            <option value="full" ${shift==='full'?'selected':''}>Full Day (8am–4pm)</option>
+            <option value="am" ${shift==='am'?'selected':''}>AM Only (8am–12pm)</option>
+            <option value="pm" ${shift==='pm'?'selected':''}>PM Only (12pm–4pm)</option>
+          </select>
+        </div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('card').innerHTML = `
+    <div class="logo">⚽</div>
+    <h1>${isUpdate ? 'Update My Availability' : 'Set Your Availability'}</h1>
+    <div class="subtitle">Nike Soccer Camps</div>
+    <p style="margin-bottom:14px;font-size:0.9rem">Hi <strong>${name}</strong>,</p>
+    <div style="text-align:center;margin-bottom:16px"><span class="camp-badge">${camp}</span></div>
+    <div class="instruction">✅ Check every day you <strong>can</strong> work. Uncheck days you can't. You can also add days that aren't on your original schedule — Coach Rich will review those.</div>
+    ${dayRows}
+    <button class="submit-btn" id="submitBtn" onclick="submitAvailability()">Submit My Availability</button>
+    <p class="note">Coach Rich will be notified of any changes.<br>Questions? Text 206-605-9954.</p>
+  `;
+}
+
+function toggleDay(day) {
+  const chk = document.getElementById(`chk-${day}`);
+  chk.checked = !chk.checked;
+  syncRow(day);
+}
+
+function syncRow(day) {
+  const chk = document.getElementById(`chk-${day}`);
+  const row = document.getElementById(`row-${day}`);
+  const wrap = document.getElementById(`shift-wrap-${day}`);
+  const meta = document.getElementById(`meta-${day}`);
+  const sel = document.getElementById(`shift-${day}`);
+  if (chk.checked) {
+    row.classList.add('checked');
+    wrap.classList.remove('shift-hidden');
+    meta.textContent = sel.value==='full'?'Full Day':sel.value==='am'?'AM Only':'PM Only';
+  } else {
+    row.classList.remove('checked');
+    wrap.classList.add('shift-hidden');
+    meta.textContent = 'Tap to add this day';
+  }
+}
+
+function updateMeta(day) {
+  const sel = document.getElementById(`shift-${day}`);
+  const meta = document.getElementById(`meta-${day}`);
+  if (meta) meta.textContent = sel.value==='full'?'Full Day':sel.value==='am'?'AM Only':'PM Only';
+}
+
+async function submitAvailability() {
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  const days = DAYS.map(day => ({
+    day,
+    shift: document.getElementById(`shift-${day}`)?.value || 'full',
+    available: document.getElementById(`chk-${day}`)?.checked || false
+  }));
+
+  const checkedCount = days.filter(d => d.available).length;
+  if (checkedCount === 0) {
+    alert('Please check at least one day you can work. If you cannot work any days, contact Rich directly at 206-605-9954.');
+    btn.disabled = false;
+    btn.textContent = 'Submit My Availability';
+    return;
+  }
+
+  const r = await fetch('/api/staff/update-availability', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, days })
   });
 
   if (r.ok) {
-    const card = document.getElementById('card');
-    card.innerHTML = `
-      <div class="logo">⚽</div>
-      <h1>You're Confirmed!</h1>
-      <div class="subtitle">Nike Soccer Camps</div>
-      <div class="already-confirmed">
-        <div class="check">✅</div>
-        <p>Thanks! Rich has been notified.</p>
-        <small>See you at camp!</small>
-      </div>
-    `;
+    const result = await r.json();
+    renderSuccess(result);
   } else {
+    const e = await r.json().catch(() => ({}));
+    alert(`Something went wrong: ${e.error || 'Server error. Please try again or contact Rich.'}`);
     btn.disabled = false;
-    btn.textContent = '✅ Confirm My Schedule';
-    alert('Something went wrong. Please try again or contact Rich.');
+    btn.textContent = 'Submit My Availability';
   }
+}
+
+function renderSuccess(result) {
+  const { confirmed, cancelled, added } = result;
+  const sl = s => s==='full'?'Full Day':s==='am'?'AM (8am–12pm)':s==='pm'?'PM (12pm–4pm)':s||'';
+  let rows = '';
+  confirmed.forEach(({day,shift}) => { rows += `<li>✅ ${DAY_LABELS[day]} — ${sl(shift)}</li>`; });
+  added.forEach(({day,shift}) => { rows += `<li>➕ ${DAY_LABELS[day]} — ${sl(shift)} (new — pending Coach Rich's approval)</li>`; });
+  cancelled.forEach(({day}) => { rows += `<li>❌ ${DAY_LABELS[day]} — removed from your schedule</li>`; });
+
+  document.getElementById('card').innerHTML = `
+    <div class="logo">⚽</div>
+    <h1>Availability Submitted!</h1>
+    <div class="subtitle">Nike Soccer Camps</div>
+    <div class="success-box">
+      <div class="check">✅</div>
+      <h2>Thanks! Coach Rich has been notified.</h2>
+      <ul class="summary-list">${rows}</ul>
+    </div>
+    <p class="note" style="margin-top:18px">See you at camp! Questions? Text Rich at 206-605-9954.</p>
+  `;
 }
 
 load();

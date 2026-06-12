@@ -1221,6 +1221,101 @@ app.post('/api/admin/mark-sms-sent', requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
+// ── Staff Update Availability (token-based, per-day checkboxes) ──────────────────
+
+// POST /api/staff/update-availability — submit day-by-day availability from confirmation page
+app.post('/api/staff/update-availability', async (req, res) => {
+  try {
+    const { token, days } = req.body;
+    if (!token || !Array.isArray(days)) return res.status(400).json({ error: 'Token and days required' });
+
+    const tokenRows = await query(
+      'SELECT sc.staff_id, sc.camp, s.name FROM staff_confirmations sc JOIN staff s ON sc.staff_id = s.id WHERE sc.token = $1',
+      [token]
+    );
+    if (!tokenRows.length) return res.status(404).json({ error: 'Invalid link' });
+    const { staff_id, camp, name } = tokenRows[0];
+
+    // Get existing requests, deduplicate by day (keep lowest id per day)
+    let existingReqs;
+    if (IS_PG) {
+      existingReqs = await query(
+        'SELECT DISTINCT ON (day) * FROM requests WHERE staff_id = $1 AND camp = $2 ORDER BY day, id',
+        [staff_id, camp]
+      );
+    } else {
+      existingReqs = await query(
+        'SELECT * FROM requests WHERE staff_id = $1 AND camp = $2 ORDER BY day, id',
+        [staff_id, camp]
+      );
+    }
+    const reqByDay = {};
+    existingReqs.forEach(r => { if (!reqByDay[r.day]) reqByDay[r.day] = r; });
+
+    const confirmed = [], cancelled = [], added = [];
+    const sl = s => s === 'full' ? 'Full Day' : s === 'am' ? 'AM' : s === 'pm' ? 'PM' : (s || '');
+
+    for (const { day, shift, available } of days) {
+      const existing = reqByDay[day];
+      if (available) {
+        if (existing) {
+          if (existing.status === 'cancelled') {
+            if (IS_PG) {
+              await query("UPDATE requests SET status = 'confirmed', confirmed_shift = $1, cancelled_at = NULL WHERE id = $2", [shift, existing.id]);
+            } else {
+              await query("UPDATE requests SET status = 'confirmed', confirmed_shift = $1, cancelled_at = NULL WHERE id = $2", [shift, existing.id]);
+            }
+          } else {
+            await query('UPDATE requests SET confirmed_shift = $1 WHERE id = $2', [shift, existing.id]);
+          }
+          confirmed.push({ day, shift });
+        } else {
+          // New day staff added — insert as pending for Rich to review
+          await query(
+            "INSERT INTO requests (staff_id, camp, day, shift, status, confirmed_shift) VALUES ($1,$2,$3,$4,'pending',$5)",
+            [staff_id, camp, day, shift, shift]
+          );
+          added.push({ day, shift });
+        }
+      } else {
+        if (existing && existing.status !== 'cancelled') {
+          if (IS_PG) {
+            await query("UPDATE requests SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1", [existing.id]);
+          } else {
+            await query("UPDATE requests SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP WHERE id = $1", [existing.id]);
+          }
+          cancelled.push({ day });
+        }
+      }
+    }
+
+    // Mark staff as confirmed (they've reviewed and submitted their availability)
+    if (IS_PG) {
+      await query('UPDATE staff_confirmations SET confirmed = TRUE, confirmed_at = NOW() WHERE staff_id = $1 AND camp = $2', [staff_id, camp]);
+    } else {
+      await query('UPDATE staff_confirmations SET confirmed = TRUE, confirmed_at = CURRENT_TIMESTAMP WHERE staff_id = $1 AND camp = $2', [staff_id, camp]);
+    }
+
+    // Email Rich a summary
+    let bodyHtml = `<p><strong>${name}</strong> submitted their availability for <strong>${camp}</strong>:</p><ul>`;
+    confirmed.forEach(({ day, shift }) => { bodyHtml += `<li>✅ ${day} — ${sl(shift)}</li>`; });
+    added.forEach(({ day, shift }) => { bodyHtml += `<li>➕ ${day} — ${sl(shift)} <em>(new day added — pending your approval in admin)</em></li>`; });
+    cancelled.forEach(({ day }) => { bodyHtml += `<li>❌ ${day} — cancelled</li>`; });
+    bodyHtml += '</ul>';
+    if (cancelled.length || added.length) {
+      bodyHtml += `<p><a href="${BASE_URL}/admin">View Open Shifts &amp; pending requests in Admin Panel →</a></p>`;
+    }
+    const subject = `📋 Availability update: ${name} — ${camp}`;
+    if (resendClient) {
+      resendClient.emails.send({ from: RESEND_FROM, to: GMAIL_USER, subject, html: bodyHtml }).catch(e => console.error('Notify error:', e));
+    } else if (emailTransport) {
+      emailTransport.sendMail({ from: `"Nike Soccer Camps" <${GMAIL_USER}>`, to: GMAIL_USER, subject, html: bodyHtml }).catch(e => console.error('Notify error:', e));
+    }
+
+    res.json({ ok: true, confirmed, cancelled, added });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 // ── Staff Manage / Cancellation (token-based) ───────────────────────────────
 
 // Serve staff-manage page
