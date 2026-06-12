@@ -69,7 +69,19 @@ async function sendConfirmationEmail(staffName, staffEmail, camp, token, shift) 
       subject: `Please confirm your schedule — ${camp}`,
       html
     });
-    if (error) throw new Error(`Resend error: ${error.message}`);
+    if (error) {
+      console.warn(`Resend failed: ${error.message} — falling back to Gmail`);
+      if (emailTransport) {
+        await emailTransport.sendMail({
+          from: `"Nike Soccer Camps" <${GMAIL_USER}>`,
+          to: staffEmail,
+          subject: `Please confirm your schedule — ${camp}`,
+          html
+        });
+        return true;
+      }
+      throw new Error(`Resend error: ${error.message}`);
+    }
     return true;
   } else if (emailTransport) {
     await emailTransport.sendMail({
@@ -1025,6 +1037,36 @@ app.get('/api/admin/confirmations', requireAdmin, async (req, res) => {
     `);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/admin/test-email — send a test email to verify Resend/Gmail config
+app.post('/api/admin/test-email', requireAdmin, async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'email required' });
+  try {
+    if (resendClient) {
+      const { error } = await resendClient.emails.send({
+        from: RESEND_FROM,
+        to: email,
+        subject: 'Nike Soccer Camps - Email Test',
+        html: '<p>This is a test email from the Nike Soccer Camps scheduler. Email is working correctly!</p>'
+      });
+      if (error) return res.json({ ok: false, provider: 'resend', error: error.message });
+      return res.json({ ok: true, provider: 'resend', sent_to: email });
+    } else if (emailTransport) {
+      await emailTransport.sendMail({
+        from: `"Nike Soccer Camps" <${GMAIL_USER}>`,
+        to: email,
+        subject: 'Nike Soccer Camps - Email Test',
+        html: '<p>This is a test email from the Nike Soccer Camps scheduler. Email is working correctly!</p>'
+      });
+      return res.json({ ok: true, provider: 'gmail', sent_to: email });
+    } else {
+      return res.json({ ok: false, error: 'No email transport configured' });
+    }
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
 });
 
 // POST /api/admin/test-sms — send a test SMS to verify Twilio config
