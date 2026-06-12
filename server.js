@@ -1245,8 +1245,15 @@ app.get('/api/staff/manage', async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'Invalid or expired link' });
     const { staff_id, camp, name, confirmed } = rows[0];
     const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+    // Deduplicate by day — keep the first confirmed per day, or first cancelled
+    const seen = {};
     const shifts = rows
       .sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day))
+      .filter(r => {
+        const key = `${r.day}|${r.status}`;
+        if (!seen[r.day]) { seen[r.day] = r.status; return true; }
+        return false;
+      })
       .map(r => ({ req_id: r.req_id, day: r.day, shift: r.confirmed_shift || r.shift, status: r.status }));
     res.json({ name, camp, confirmed, shifts });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }

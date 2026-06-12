@@ -105,7 +105,10 @@ async function load() {
       <tbody>${scheduleRows}</tbody>
     </table>
     <button class="confirm-btn" id="confirmBtn" onclick="confirm()">✅ Confirm My Schedule</button>
-    <p style="font-size:0.8rem;color:#aaa;text-align:center;margin-top:14px">Questions? Reply to the email from Rich or text 206-605-9954.</p>
+    <div style="margin-top:14px;text-align:center">
+      <a href="/staff-manage?token=${encodeURIComponent(token)}" style="display:inline-block;padding:10px 20px;background:#f5f5f5;color:#555;border-radius:8px;font-size:0.85rem;font-weight:600;text-decoration:none;border:1px solid #ddd">⚙️ Need to cancel or change a day?</a>
+    </div>
+    <p style="font-size:0.8rem;color:#aaa;text-align:center;margin-top:12px">Questions? Reply to the email from Rich or text 206-605-9954.</p>
   `;
 }
 
