@@ -1027,6 +1027,35 @@ app.get('/api/admin/confirmations', requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
+// POST /api/admin/test-sms — send a test SMS to verify Twilio config
+app.post('/api/admin/test-sms', requireAdmin, async (req, res) => {
+  const { phone } = req.body;
+  if (!phone) return res.status(400).json({ error: 'phone required' });
+  if (!twilioClient) return res.json({ ok: false, error: 'Twilio not configured', twilio: false });
+  try {
+    const digits = phone.replace(/\D/g, '');
+    const e164 = digits.length === 10 ? `+1${digits}` : `+${digits}`;
+    await twilioClient.messages.create({
+      body: 'Nike Soccer Camps: Twilio SMS test - working correctly!',
+      from: TWILIO_FROM_NUMBER,
+      to: e164
+    });
+    res.json({ ok: true, twilio: true, sent_to: e164 });
+  } catch (e) {
+    res.json({ ok: false, twilio: true, error: e.message });
+  }
+});
+
+// GET /api/admin/sms-status — check Twilio config without sending
+app.get('/api/admin/sms-status', requireAdmin, (req, res) => {
+  res.json({
+    twilioConfigured: !!twilioClient,
+    fromNumber: TWILIO_FROM_NUMBER ? TWILIO_FROM_NUMBER.slice(0,4) + '****' : null,
+    hasSid: !!TWILIO_ACCOUNT_SID,
+    hasToken: !!TWILIO_AUTH_TOKEN
+  });
+});
+
 // POST /api/admin/send-all-confirmations — bulk send confirmation emails to all confirmed staff
 app.post('/api/admin/send-all-confirmations', requireAdmin, async (req, res) => {
   try {
