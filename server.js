@@ -1044,30 +1044,33 @@ app.get('/api/admin/confirmations', requireAdmin, async (req, res) => {
 app.post('/api/admin/test-email', requireAdmin, async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'email required' });
-  try {
-    if (resendClient) {
+  // Try Resend first, fall back to Gmail
+  if (resendClient) {
+    try {
       const { error } = await resendClient.emails.send({
         from: RESEND_FROM,
         to: email,
         subject: 'Nike Soccer Camps - Email Test',
-        html: '<p>This is a test email from the Nike Soccer Camps scheduler. Email is working correctly!</p>'
+        html: '<p>Test email from Nike Soccer Camps scheduler via Resend.</p>'
       });
-      if (error) return res.json({ ok: false, provider: 'resend', error: error.message });
-      return res.json({ ok: true, provider: 'resend', sent_to: email });
-    } else if (emailTransport) {
+      if (!error) return res.json({ ok: true, provider: 'resend', sent_to: email });
+      console.warn('Resend test failed:', error.message);
+    } catch (e) { console.warn('Resend test error:', e.message); }
+  }
+  if (emailTransport) {
+    try {
       await emailTransport.sendMail({
         from: `"Nike Soccer Camps" <${GMAIL_USER}>`,
         to: email,
-        subject: 'Nike Soccer Camps - Email Test',
-        html: '<p>This is a test email from the Nike Soccer Camps scheduler. Email is working correctly!</p>'
+        subject: 'Nike Soccer Camps - Email Test (Gmail)',
+        html: '<p>Test email from Nike Soccer Camps scheduler via Gmail.</p>'
       });
       return res.json({ ok: true, provider: 'gmail', sent_to: email });
-    } else {
-      return res.json({ ok: false, error: 'No email transport configured' });
+    } catch (e) {
+      return res.json({ ok: false, error: `Gmail error: ${e.message}` });
     }
-  } catch (e) {
-    res.json({ ok: false, error: e.message });
   }
+  return res.json({ ok: false, error: 'No email transport configured or both failed' });
 });
 
 // POST /api/admin/test-sms — send a test SMS to verify Twilio config
@@ -1097,6 +1100,8 @@ app.get('/api/admin/sms-status', requireAdmin, (req, res) => {
     hasSid: !!TWILIO_ACCOUNT_SID,
     hasToken: !!TWILIO_AUTH_TOKEN,
     emailConfigured: !!(resendClient || emailTransport),
+    resendConfigured: !!resendClient,
+    gmailConfigured: !!emailTransport,
     emailProvider: resendClient ? 'resend' : emailTransport ? 'gmail-nodemailer' : 'none',
     gmailUser: GMAIL_USER || null
   });
