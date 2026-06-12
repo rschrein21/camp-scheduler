@@ -1046,13 +1046,16 @@ app.post('/api/admin/test-sms', requireAdmin, async (req, res) => {
   }
 });
 
-// GET /api/admin/sms-status — check Twilio config without sending
+// GET /api/admin/sms-status — check Twilio + email config
 app.get('/api/admin/sms-status', requireAdmin, (req, res) => {
   res.json({
     twilioConfigured: !!twilioClient,
     fromNumber: TWILIO_FROM_NUMBER ? TWILIO_FROM_NUMBER.slice(0,4) + '****' : null,
     hasSid: !!TWILIO_ACCOUNT_SID,
-    hasToken: !!TWILIO_AUTH_TOKEN
+    hasToken: !!TWILIO_AUTH_TOKEN,
+    emailConfigured: !!(resendClient || emailTransport),
+    emailProvider: resendClient ? 'resend' : emailTransport ? 'gmail-nodemailer' : 'none',
+    gmailUser: GMAIL_USER || null
   });
 });
 
