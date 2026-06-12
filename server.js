@@ -251,6 +251,7 @@ if (IS_PG) {
       )
     `);
     await pool.query(`ALTER TABLE staff_confirmations ADD COLUMN IF NOT EXISTS sms_sent_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP`);
     // Allow multiple directors per camp per role — drop camp+role unique, enforce director+camp unique
     await pool.query(`ALTER TABLE director_assignments DROP CONSTRAINT IF EXISTS director_assignments_camp_role_key`);
     await pool.query(`
@@ -268,6 +269,7 @@ if (IS_PG) {
   const reqCols = sqlite.prepare("PRAGMA table_info(requests)").all().map(c => c.name);
   if (reqCols.length > 0 && !reqCols.includes('day')) sqlite.exec('DROP TABLE IF EXISTS requests');
   if (reqCols.length > 0 && !reqCols.includes('confirmed_shift')) sqlite.exec('ALTER TABLE requests ADD COLUMN confirmed_shift TEXT');
+  if (reqCols.length > 0 && !reqCols.includes('cancelled_at')) sqlite.exec('ALTER TABLE requests ADD COLUMN cancelled_at DATETIME');
   const staffCols = sqlite.prepare("PRAGMA table_info(staff)").all().map(c => c.name);
   if (staffCols.length > 0 && !staffCols.includes('shirt_size')) {
     sqlite.exec('ALTER TABLE staff ADD COLUMN shirt_size TEXT');
@@ -1217,6 +1219,163 @@ app.post('/api/admin/mark-sms-sent', requireAdmin, async (req, res) => {
     );
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── Staff Manage / Cancellation (token-based) ───────────────────────────────
+
+// Serve staff-manage page
+app.get('/staff-manage', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'staff-manage.html'));
+});
+
+// GET /api/staff/manage?token=xxx — return confirmed + cancelled shifts for this staff+camp
+app.get('/api/staff/manage', async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) return res.status(400).json({ error: 'Token required' });
+    const rows = await query(`
+      SELECT sc.staff_id, sc.camp, sc.confirmed, s.name,
+             r.id as req_id, r.day, r.shift, r.confirmed_shift, r.status
+      FROM staff_confirmations sc
+      JOIN staff s ON sc.staff_id = s.id
+      JOIN requests r ON r.staff_id = sc.staff_id AND r.camp = sc.camp
+      WHERE sc.token = $1 AND r.status IN ('confirmed', 'cancelled')
+      ORDER BY r.day
+    `, [token]);
+    if (!rows.length) return res.status(404).json({ error: 'Invalid or expired link' });
+    const { staff_id, camp, name, confirmed } = rows[0];
+    const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+    const shifts = rows
+      .sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day))
+      .map(r => ({ req_id: r.req_id, day: r.day, shift: r.confirmed_shift || r.shift, status: r.status }));
+    res.json({ name, camp, confirmed, shifts });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/staff/cancel-shift — cancel a specific shift day { token, req_id }
+app.post('/api/staff/cancel-shift', async (req, res) => {
+  try {
+    const { token, req_id } = req.body;
+    if (!token || !req_id) return res.status(400).json({ error: 'Token and req_id required' });
+
+    // Verify token + ownership
+    const tokenRows = await query(
+      'SELECT sc.staff_id, sc.camp, s.name FROM staff_confirmations sc JOIN staff s ON sc.staff_id = s.id WHERE sc.token = $1',
+      [token]
+    );
+    if (!tokenRows.length) return res.status(404).json({ error: 'Invalid link' });
+    const { staff_id, camp, name } = tokenRows[0];
+
+    const reqRows = await query(
+      "SELECT * FROM requests WHERE id = $1 AND staff_id = $2 AND camp = $3 AND status = 'confirmed'",
+      [req_id, staff_id, camp]
+    );
+    if (!reqRows.length) return res.status(403).json({ error: 'Shift not found or already cancelled' });
+
+    const { day, shift, confirmed_shift } = reqRows[0];
+    const shiftStr = shiftLabel(confirmed_shift || shift);
+
+    // Cancel the shift
+    if (IS_PG) {
+      await query("UPDATE requests SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1", [req_id]);
+    } else {
+      await query("UPDATE requests SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP WHERE id = $1", [req_id]);
+    }
+
+    // Notify Rich via email
+    const richEmail = GMAIL_USER;
+    const notifyHtml = `
+      <p><strong>${name}</strong> has cancelled their <strong>${shiftStr}</strong> shift on <strong>${day}</strong> for <strong>${camp}</strong>.</p>
+      <p>Log in to the admin panel to assign a replacement from the sub-list.</p>
+      <p><a href="${BASE_URL}/admin">Open Admin Panel → Open Shifts tab</a></p>
+    `;
+    if (resendClient) {
+      resendClient.emails.send({ from: RESEND_FROM, to: richEmail, subject: `⚠️ Shift Cancelled: ${name} — ${day} ${camp}`, html: notifyHtml }).catch(e => console.error('Notify email error:', e));
+    } else if (emailTransport) {
+      emailTransport.sendMail({ from: `"Nike Soccer Camps" <${GMAIL_USER}>`, to: richEmail, subject: `⚠️ Shift Cancelled: ${name} — ${day} ${camp}`, html: notifyHtml }).catch(e => console.error('Notify email error:', e));
+    }
+
+    res.json({ ok: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET /api/admin/open-shifts — cancelled shifts + sub candidates for each
+app.get('/api/admin/open-shifts', requireAdmin, async (req, res) => {
+  try {
+    const cancelled = await query(`
+      SELECT r.id as req_id, r.camp, r.day, r.shift, r.confirmed_shift,
+             s.id as staff_id, s.name, s.phone, s.email
+      FROM requests r
+      JOIN staff s ON r.staff_id = s.id
+      WHERE r.status = 'cancelled'
+      ORDER BY r.camp, r.day
+    `);
+
+    const result = [];
+    for (const c of cancelled) {
+      const subs = await query(`
+        SELECT DISTINCT ON (s.id) s.id as staff_id, s.name, s.phone, s.email,
+               COALESCE(sr.rating, 3) as rating
+        FROM requests r
+        JOIN staff s ON r.staff_id = s.id
+        LEFT JOIN staff_ratings sr ON s.id = sr.staff_id
+        WHERE r.camp = $1 AND r.status = 'declined' AND r.staff_id != $2
+        ORDER BY s.id, sr.rating DESC
+      `, [c.camp, c.staff_id]);
+      result.push({ ...c, sub_candidates: IS_PG ? subs : subs });
+    }
+    res.json(result);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/admin/fill-open-shift — assign a sub to an open cancelled slot
+app.post('/api/admin/fill-open-shift', requireAdmin, async (req, res) => {
+  try {
+    const { open_req_id, sub_staff_id, camp, day, shift } = req.body;
+    if (!open_req_id || !sub_staff_id || !camp || !day || !shift) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Mark the cancelled slot as filled (status = 'filled') so it disappears from open-shifts
+    await query("UPDATE requests SET status = 'filled' WHERE id = $1", [open_req_id]);
+
+    // Check if sub has a request row for this camp+day already
+    const existing = await query(
+      'SELECT * FROM requests WHERE staff_id = $1 AND camp = $2 AND day = $3',
+      [sub_staff_id, camp, day]
+    );
+    if (existing.length) {
+      await query(
+        "UPDATE requests SET status = 'confirmed', confirmed_shift = $1 WHERE id = $2",
+        [shift, existing[0].id]
+      );
+    } else {
+      await query(
+        "INSERT INTO requests (staff_id, camp, day, shift, status, confirmed_shift) VALUES ($1,$2,$3,$4,'confirmed',$5)",
+        [sub_staff_id, camp, day, shift, shift]
+      );
+    }
+
+    // Create/update staff_confirmation and send notification
+    const staffRows = await query('SELECT * FROM staff WHERE id = $1', [sub_staff_id]);
+    if (staffRows.length && IS_PG) {
+      const { name, email, phone } = staffRows[0];
+      const token = uuidv4();
+      await query(`
+        INSERT INTO staff_confirmations (staff_id, camp, token)
+        VALUES ($1,$2,$3)
+        ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, confirmed = FALSE, confirmed_at = NULL, email_sent_at = NULL, sms_sent_at = NULL
+      `, [sub_staff_id, camp, token]);
+      sendConfirmationNotification(name, email, phone, camp, token, shift).then(async ({ smsSent, emailSent }) => {
+        await query(
+          'UPDATE staff_confirmations SET email_sent_at = CASE WHEN $1 THEN NOW() ELSE email_sent_at END, sms_sent_at = CASE WHEN $2 THEN NOW() ELSE sms_sent_at END WHERE staff_id = $3 AND camp = $4',
+          [emailSent, smsSent, sub_staff_id, camp]
+        );
+      }).catch(e => console.error('Sub notification error:', e));
+    }
+
+    res.json({ ok: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── Start ─────────────────────────────────────────────────

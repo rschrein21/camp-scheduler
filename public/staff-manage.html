@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage My Schedule — Nike Soccer Camps</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f0f2; color: #222; min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px; }
+  .card { background: #fff; border-radius: 14px; box-shadow: 0 2px 16px rgba(0,0,0,0.1); max-width: 480px; width: 100%; padding: 28px 24px; }
+  .logo { font-size: 2rem; text-align: center; margin-bottom: 6px; }
+  h1 { font-size: 1.15rem; font-weight: 700; text-align: center; margin-bottom: 4px; }
+  .subtitle { font-size: 0.85rem; color: #888; text-align: center; margin-bottom: 20px; }
+  .camp-badge { background: #111; color: #fff; border-radius: 20px; padding: 6px 16px; font-size: 0.85rem; font-weight: 700; display: inline-block; margin-bottom: 20px; }
+  .shift-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f5f5f5; gap: 10px; }
+  .shift-row:last-child { border-bottom: none; }
+  .shift-day { font-weight: 700; font-size: 0.95rem; min-width: 48px; }
+  .shift-badge { display: inline-block; font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 10px; }
+  .shift-full { background: #dbeafe; color: #1d4ed8; }
+  .shift-am   { background: #fef3c7; color: #92400e; }
+  .shift-pm   { background: #ede9fe; color: #5b21b6; }
+  .shift-cancelled { background: #f3f4f6; color: #999; text-decoration: line-through; }
+  .cancel-btn { padding: 6px 12px; background: #fff0f0; color: #cc2200; border: 1px solid #ffb3b3; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .cancel-btn:hover { background: #ffe4e4; }
+  .cancel-btn:disabled { opacity: 0.5; cursor: default; }
+  .cancelled-label { font-size: 0.78rem; color: #aaa; font-style: italic; }
+  .note { font-size: 0.8rem; color: #888; margin-top: 20px; text-align: center; line-height: 1.5; }
+  .loading { text-align: center; color: #888; padding: 40px; font-size: 0.9rem; }
+  .error-state { text-align: center; color: #cc3300; padding: 20px; }
+  .hi-name { font-weight: 700; }
+  .section-label { font-size: 0.75rem; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+  .confirm-notice { background: #f0faf4; border: 1px solid #a7d7b5; border-radius: 8px; padding: 12px 16px; font-size: 0.85rem; color: #1a7a3a; margin-bottom: 20px; }
+
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 100; }
+  .modal { background: #fff; border-radius: 12px; padding: 24px; max-width: 360px; width: 100%; }
+  .modal h2 { font-size: 1rem; margin-bottom: 10px; }
+  .modal p { font-size: 0.88rem; color: #555; margin-bottom: 20px; line-height: 1.5; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-cancel-confirm { background: #cc2200; color: #fff; border: none; border-radius: 6px; padding: 10px 18px; font-size: 0.88rem; font-weight: 700; cursor: pointer; }
+  .btn-cancel-confirm:hover { background: #aa1800; }
+  .btn-keep { background: #f0f0f0; color: #333; border: none; border-radius: 6px; padding: 10px 18px; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+  .btn-keep:hover { background: #e0e0e0; }
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="loading">Loading your schedule…</div>
+</div>
+
+<div id="confirmModal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <h2>Cancel this shift?</h2>
+    <p id="modalText">Are you sure you want to cancel your <strong>Monday</strong> shift? This cannot be undone and Coach Rich will be notified.</p>
+    <div class="modal-actions">
+      <button class="btn-keep" onclick="closeModal()">Keep it</button>
+      <button class="btn-cancel-confirm" id="modalConfirmBtn">Yes, cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const token = params.get('token');
+let scheduleData = null;
+
+const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+function shiftLabel(s) {
+  if (s === 'full') return 'Full Day';
+  if (s === 'am')   return 'AM Only';
+  if (s === 'pm')   return 'PM Only';
+  return s || '';
+}
+function shiftClass(s) {
+  if (s === 'full') return 'shift-full';
+  if (s === 'am')   return 'shift-am';
+  if (s === 'pm')   return 'shift-pm';
+  return '';
+}
+
+async function load() {
+  const card = document.getElementById('card');
+  if (!token) {
+    card.innerHTML = '<div class="error-state">❌ Invalid link. Check your confirmation email for the correct link.</div>';
+    return;
+  }
+
+  const r = await fetch(`/api/staff/manage?token=${encodeURIComponent(token)}`);
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    card.innerHTML = `<div class="error-state">❌ ${e.error || 'Invalid or expired link'}</div>`;
+    return;
+  }
+
+  scheduleData = await r.json();
+  render();
+}
+
+function render() {
+  const { name, camp, confirmed, shifts } = scheduleData;
+  const card = document.getElementById('card');
+
+  const confirmedShifts = shifts.filter(s => s.status === 'confirmed');
+  const cancelledShifts = shifts.filter(s => s.status === 'cancelled');
+  const allCancelled = confirmedShifts.length === 0 && cancelledShifts.length > 0;
+
+  const shiftRows = shifts.map(s => {
+    if (s.status === 'cancelled') {
+      return `
+        <div class="shift-row">
+          <span class="shift-day">${s.day}</span>
+          <span class="shift-badge shift-cancelled">${shiftLabel(s.shift)}</span>
+          <span class="cancelled-label">Cancelled</span>
+        </div>`;
+    }
+    return `
+      <div class="shift-row" id="row-${s.req_id}">
+        <span class="shift-day">${s.day}</span>
+        <span class="shift-badge ${shiftClass(s.shift)}">${shiftLabel(s.shift)}</span>
+        <button class="cancel-btn" onclick="promptCancel(${s.req_id}, '${s.day}', '${shiftLabel(s.shift)}')">Cancel shift</button>
+      </div>`;
+  }).join('');
+
+  card.innerHTML = `
+    <div class="logo">⚽</div>
+    <h1>My Schedule</h1>
+    <div class="subtitle">Nike Soccer Camps</div>
+    ${confirmed ? '<div class="confirm-notice">✅ You\'re confirmed for this camp</div>' : ''}
+    <div style="text-align:center;margin-bottom:18px"><span class="camp-badge">${camp}</span></div>
+    <p class="section-label">Your shifts</p>
+    ${shiftRows}
+    ${allCancelled ? '<p style="text-align:center;color:#888;font-size:0.88rem;margin-top:16px">All your shifts for this camp have been cancelled. Contact Rich if this was a mistake.</p>' : ''}
+    <p class="note">Need to cancel a shift? Tap the button next to that day. Coach Rich will be notified and can find a replacement.<br><br>Questions? Text Rich at 206-605-9954.</p>
+  `;
+}
+
+let pendingCancelReqId = null;
+
+function promptCancel(req_id, day, shiftStr) {
+  pendingCancelReqId = req_id;
+  document.getElementById('modalText').innerHTML = `Are you sure you want to cancel your <strong>${day} (${shiftStr})</strong> shift for <strong>${scheduleData.camp}</strong>? Coach Rich will be notified.`;
+  document.getElementById('confirmModal').style.display = 'flex';
+  document.getElementById('modalConfirmBtn').onclick = () => doCancel(req_id, day);
+}
+
+function closeModal() {
+  document.getElementById('confirmModal').style.display = 'none';
+  pendingCancelReqId = null;
+}
+
+async function doCancel(req_id, day) {
+  const btn = document.getElementById('modalConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Cancelling…';
+
+  const r = await fetch('/api/staff/cancel-shift', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, req_id })
+  });
+
+  closeModal();
+
+  if (r.ok) {
+    // Update local data and re-render
+    const shift = scheduleData.shifts.find(s => s.req_id === req_id);
+    if (shift) shift.status = 'cancelled';
+    render();
+  } else {
+    const e = await r.json().catch(() => ({}));
+    alert(`Could not cancel: ${e.error || 'Server error. Please try again or contact Rich.'}`);
+  }
+}
+
+load();
+</script>
+</body>
+</html>

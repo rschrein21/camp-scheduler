@@ -85,7 +85,10 @@ async function load() {
         <thead><tr><th>Day</th><th>Shift</th></tr></thead>
         <tbody>${scheduleRows}</tbody>
       </table>
-      <p style="font-size:0.8rem;color:#aaa;text-align:center">Questions? Reply to the email from Rich or text 206-605-9954.</p>
+      <div style="margin-top:18px;text-align:center">
+        <a href="/staff-manage?token=${encodeURIComponent(token)}" style="display:inline-block;padding:10px 20px;background:#f5f5f5;color:#555;border-radius:8px;font-size:0.85rem;font-weight:600;text-decoration:none;border:1px solid #ddd">⚙️ Need to cancel a shift?</a>
+      </div>
+      <p style="font-size:0.8rem;color:#aaa;text-align:center;margin-top:12px">Questions? Reply to the email from Rich or text 206-605-9954.</p>
     `;
     return;
   }
