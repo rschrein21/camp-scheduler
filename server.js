@@ -44,7 +44,8 @@ if (RESEND_API_KEY) {
     console.log('Resend email configured ✓');
   } catch (e) { console.warn('Resend load error:', e.message); }
 }
-const emailTransport = (!resendClient && GMAIL_APP_PASSWORD) ? nodemailer.createTransport({
+// emailTransport always built when GMAIL_APP_PASSWORD available — used as Resend fallback too
+const emailTransport = GMAIL_APP_PASSWORD ? nodemailer.createTransport({
   service: 'gmail',
   auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD }
 }) : null;
