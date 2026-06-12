@@ -240,6 +240,7 @@ function switchTab(tab) {
   document.getElementById('directorsView').style.display = tab==='directors' ? '' : 'none';
   if (tab === 'directors') loadDirectors();
   if (tab === 'openShifts') loadOpenShifts();
+  if (tab === 'daily') load();  // Always refresh data when switching to daily summary
 }
 
 async function load() {
@@ -490,7 +491,7 @@ function renderDailySummary() {
     }
   });
 
-  let html = '<div style="padding:16px">';
+  let html = '<div style="padding:16px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="font-size:0.8rem;color:#888">Updates when you switch to this tab</span><button onclick="load()" style="padding:6px 14px;background:#0066cc;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer">↻ Refresh Now</button></div>';
   campOrder.forEach(campName => {
     const dayMap = campDayStaff[campName];
     if (!dayMap) return;
