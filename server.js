@@ -997,16 +997,32 @@ app.get('/api/staff-confirm', async (req, res) => {
   try {
     const { token } = req.query;
     if (!token) return res.status(400).json({ error: 'Token required' });
-    const rows = await query(`
-      SELECT sc.confirmed, sc.confirmed_at, sc.camp, sc.staff_id,
-             s.name, s.email,
-             r.day, r.shift, r.confirmed_shift
-      FROM staff_confirmations sc
-      JOIN staff s ON sc.staff_id = s.id
-      JOIN requests r ON r.staff_id = sc.staff_id AND r.camp = sc.camp AND r.status = 'confirmed'
-      WHERE sc.token = $1
-      ORDER BY r.day
-    `, [token]);
+    let rows;
+    if (IS_PG) {
+      rows = await query(`
+        SELECT sc.confirmed, sc.confirmed_at, sc.camp, sc.staff_id,
+               s.name, s.email,
+               r.day, r.shift, r.confirmed_shift
+        FROM staff_confirmations sc
+        JOIN staff s ON sc.staff_id = s.id
+        JOIN (SELECT DISTINCT ON (staff_id, camp, day) * FROM requests WHERE status = 'confirmed' ORDER BY staff_id, camp, day, id) r
+          ON r.staff_id = sc.staff_id AND r.camp = sc.camp
+        WHERE sc.token = $1
+        ORDER BY r.day
+      `, [token]);
+    } else {
+      rows = await query(`
+        SELECT sc.confirmed, sc.confirmed_at, sc.camp, sc.staff_id,
+               s.name, s.email,
+               r.day, r.shift, r.confirmed_shift
+        FROM staff_confirmations sc
+        JOIN staff s ON sc.staff_id = s.id
+        JOIN requests r ON r.staff_id = sc.staff_id AND r.camp = sc.camp AND r.status = 'confirmed'
+        WHERE sc.token = $1
+        GROUP BY r.day
+        ORDER BY r.day
+      `, [token]);
+    }
     if (!rows.length) return res.status(404).json({ error: 'Invalid or expired link' });
     const { confirmed, confirmed_at, camp, name, email } = rows[0];
     const schedule = rows.map(r => ({ day: r.day, shift: r.confirmed_shift || r.shift }));
