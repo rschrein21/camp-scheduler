@@ -774,6 +774,21 @@ app.post('/api/admin/status', requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
+// POST /api/admin/cleanup-dupes — remove duplicate request rows, keep lowest id per staff+camp+day
+app.post('/api/admin/cleanup-dupes', requireAdmin, async (req, res) => {
+  try {
+    if (!IS_PG) return res.json({ ok: true, deleted: 0, msg: 'SQLite not supported' });
+    const result = await query(`
+      DELETE FROM requests
+      WHERE id NOT IN (
+        SELECT MIN(id) FROM requests
+        GROUP BY staff_id, camp, day
+      )
+    `);
+    res.json({ ok: true, deleted: result.length || 0 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // POST /api/admin/bg-check — toggle background check done for a staff member
 app.post('/api/admin/bg-check', requireAdmin, async (req, res) => {
   try {
