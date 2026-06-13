@@ -253,6 +253,8 @@ if (IS_PG) {
     await pool.query(`ALTER TABLE staff_confirmations ADD COLUMN IF NOT EXISTS sms_sent_at TIMESTAMP`);
     await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP`);
     await pool.query(`ALTER TABLE director_availability ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'skills'`);
+    await pool.query(`ALTER TABLE staff ADD COLUMN IF NOT EXISTS bg_check_done BOOLEAN NOT NULL DEFAULT FALSE`);
+    await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS sub_list BOOLEAN NOT NULL DEFAULT FALSE`);
     // Allow multiple directors per camp per role — drop camp+role unique, enforce director+camp unique
     await pool.query(`ALTER TABLE director_assignments DROP CONSTRAINT IF EXISTS director_assignments_camp_role_key`);
     await pool.query(`
@@ -676,7 +678,9 @@ app.get('/api/admin/camps', requireAdmin, async (req, res) => {
   try {
     const rows = await query(`
       SELECT r.camp, r.day, r.shift, r.confirmed_shift, r.status, r.id as req_id,
+             r.sub_list,
              s.name, s.email, s.phone, s.preferred_role, s.id as staff_id,
+             s.bg_check_done,
              COALESCE(sr.rating, 3) as rating
       FROM requests r
       JOIN staff s ON r.staff_id = s.id
@@ -686,6 +690,45 @@ app.get('/api/admin/camps', requireAdmin, async (req, res) => {
     res.json(rows);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
+
+// Helper: auto-send confirmation if not already sent for this staff+camp
+async function maybeAutoConfirm(staff_id, camp) {
+  try {
+    // Check if already sent
+    const existing = await query(
+      'SELECT email_sent_at, sms_sent_at FROM staff_confirmations WHERE staff_id = $1 AND camp = $2',
+      [staff_id, camp]
+    );
+    if (existing.length && (existing[0].email_sent_at || existing[0].sms_sent_at)) return; // already sent
+
+    const staffRows = await query(
+      `SELECT DISTINCT ON (s.id) s.name, s.email, s.phone, r.confirmed_shift, r.shift
+       FROM staff s JOIN requests r ON r.staff_id = s.id
+       WHERE s.id = $1 AND r.camp = $2 AND r.status = 'confirmed'
+       ORDER BY s.id, r.id`,
+      [staff_id, camp]
+    );
+    if (!staffRows.length) return;
+    const { name, email, phone } = staffRows[0];
+    const shift = staffRows[0].confirmed_shift || staffRows[0].shift;
+    const token = uuidv4();
+    if (IS_PG) {
+      await query(
+        `INSERT INTO staff_confirmations (staff_id, camp, token) VALUES ($1,$2,$3)
+         ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, email_sent_at = NULL, sms_sent_at = NULL`,
+        [staff_id, camp, token]
+      );
+    }
+    sendConfirmationNotification(name, email, phone, camp, token, shift).then(async ({ smsSent, emailSent }) => {
+      if (IS_PG) {
+        await query(
+          'UPDATE staff_confirmations SET email_sent_at = CASE WHEN $1 THEN NOW() ELSE email_sent_at END, sms_sent_at = CASE WHEN $2 THEN NOW() ELSE sms_sent_at END WHERE staff_id = $3 AND camp = $4',
+          [emailSent, smsSent, staff_id, camp]
+        );
+      }
+    }).catch(e => console.error('Auto-confirm notification error:', e));
+  } catch (e) { console.error('maybeAutoConfirm error:', e); }
+}
 
 app.post('/api/admin/status', requireAdmin, async (req, res) => {
   try {
@@ -699,41 +742,12 @@ app.post('/api/admin/status', requireAdmin, async (req, res) => {
       );
     } else {
       // Bulk camp update: update all rows for this staff+camp
-      // confirmed_shift: 'am'|'pm'|'full' overrides submitted shift; null = use submitted
       await query(
         'UPDATE requests SET status = $1, confirmed_shift = $2 WHERE staff_id = $3 AND camp = $4',
         [status, confirmed_shift || null, staff_id, camp]
       );
 
-      // When confirming: generate/send confirmation (SMS-first, email backup)
-      if (status === 'confirmed') {
-        const staffRows = await query(
-          'SELECT s.name, s.email, s.phone, r.confirmed_shift, r.shift FROM staff s JOIN requests r ON r.staff_id = s.id WHERE s.id = $1 AND r.camp = $2 LIMIT 1',
-          [staff_id, camp]
-        );
-        if (staffRows.length) {
-          const { name, email, phone } = staffRows[0];
-          const shift = staffRows[0].confirmed_shift || staffRows[0].shift;
-          const token = uuidv4();
-          if (IS_PG) {
-            await query(`
-              INSERT INTO staff_confirmations (staff_id, camp, token, email_sent_at, sms_sent_at)
-              VALUES ($1, $2, $3, NULL, NULL)
-              ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, confirmed = FALSE, confirmed_at = NULL, email_sent_at = NULL, sms_sent_at = NULL
-            `, [staff_id, camp, token]);
-          }
-          sendConfirmationNotification(name, email, phone, camp, token, shift).then(async ({ smsSent, emailSent }) => {
-            if (IS_PG) {
-              await query(
-                'UPDATE staff_confirmations SET email_sent_at = CASE WHEN $1 THEN NOW() ELSE email_sent_at END, sms_sent_at = CASE WHEN $2 THEN NOW() ELSE sms_sent_at END WHERE staff_id = $3 AND camp = $4',
-                [emailSent, smsSent, staff_id, camp]
-              );
-            }
-          }).catch(e => console.error('Notification error:', e));
-        }
-      }
-
-      // Auto-decline conflicting camps when confirming:
+      // Auto-decline conflicting camps when confirming
       if (status === 'confirmed') {
         const datePart = camp.split(' \u00b7 ')[0];
         if (datePart) {
@@ -743,15 +757,37 @@ app.post('/api/admin/status', requireAdmin, async (req, res) => {
           );
           const conflicts = rows.filter(r => r.camp.startsWith(datePart + ' \u00b7'));
           for (const conflict of conflicts) {
-            await query(
-              "UPDATE requests SET status = 'declined' WHERE staff_id = $1 AND camp = $2",
-              [staff_id, conflict.camp]
-            );
+            await query("UPDATE requests SET status = 'declined' WHERE staff_id = $1 AND camp = $2", [staff_id, conflict.camp]);
           }
         }
       }
     }
 
+    // Auto-send confirmation email/SMS if confirming (both per-day and bulk), only if not already sent
+    if (status === 'confirmed') {
+      const sid = staff_id || (req_id ? (await query('SELECT staff_id, camp FROM requests WHERE id = $1', [req_id]))[0]?.staff_id : null);
+      const cmp = camp || (req_id ? (await query('SELECT camp FROM requests WHERE id = $1', [req_id]))[0]?.camp : null);
+      if (sid && cmp) maybeAutoConfirm(sid, cmp);
+    }
+
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/admin/bg-check — toggle background check done for a staff member
+app.post('/api/admin/bg-check', requireAdmin, async (req, res) => {
+  try {
+    const { staff_id, done } = req.body;
+    await query('UPDATE staff SET bg_check_done = $1 WHERE id = $2', [!!done, staff_id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/admin/sub-list — toggle sub-list flag on a declined request
+app.post('/api/admin/sub-list', requireAdmin, async (req, res) => {
+  try {
+    const { req_id, sub_list } = req.body;
+    await query('UPDATE requests SET sub_list = $1 WHERE id = $2', [!!sub_list, req_id]);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });

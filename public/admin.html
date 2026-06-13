@@ -121,16 +121,8 @@
     <div class="tab" onclick="switchTab('openShifts')">Open Shifts</div>
     <div class="tab" onclick="switchTab('directors')">Directors</div>
   </div>
-  <div style="background:#fff8e8;border-bottom:1px solid #f0c060;padding:10px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <span style="font-size:0.85rem;color:#7a5c00">📧 <strong>Confirmation Emails</strong></span>
-    <select id="confirmCampFilter" style="padding:5px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.83rem">
-      <option value="">All Camps</option>
-      <option value="June 15–19 · Seattle University" selected>June 15–19 · Seattle University</option>
-      <option value="June 22–26 · Seattle University">June 22–26 · Seattle University</option>
-      <option value="June 22–26 · West Seattle Del Ridge">June 22–26 · West Seattle Del Ridge</option>
-    </select>
-    <button onclick="sendAllConfirmations()" style="padding:6px 14px;background:#f0c060;border:none;border-radius:6px;font-size:0.83rem;font-weight:600;cursor:pointer">Send Confirmation Emails</button>
-    <span id="confirmBulkStatus" style="font-size:0.8rem;color:#555"></span>
+  <div style="background:#e8f4ff;border-bottom:1px solid #b3d7ff;padding:8px 24px;font-size:0.8rem;color:#004499">
+    ℹ️ Confirmation emails send automatically when you confirm a staff member. Use the <strong>Resend</strong> button on individual staff if needed.
   </div>
   <div class="content">
     <div id="campsView"></div>
@@ -312,6 +304,7 @@ function renderCamps() {
     if (!campMap[row.camp][key]) campMap[row.camp][key] = {
       name: row.name, email: row.email, preferred_role: row.preferred_role,
       rating: row.rating, staff_id: row.staff_id, days: {},
+      bg_check_done: row.bg_check_done,
       overallStatus: row.status, confirmedShift: null
     };
     campMap[row.camp][key].days[row.day] = {
@@ -379,6 +372,7 @@ function renderCamps() {
           <th>Rating</th>
           ${DAYS.map(d => `<th>${d}</th>`).join('')}
           <th>Status</th>
+          <th>BG Check</th>
           <th>Staff Confirmed</th>
         </tr></thead><tbody>`;
       staffArr.forEach(s => {
@@ -416,6 +410,12 @@ function renderCamps() {
               <option value="declined"     ${dval==='declined'     ?'selected':''}>❌ Declined</option>
             </select>
             <button class="detail-btn" onclick="toggleDetails('${detailId}')">Details ▾</button>
+          </td>
+          <td style="text-align:center">
+            <label title="Background check completed" style="cursor:pointer;display:flex;align-items:center;gap:5px;justify-content:center">
+              <input type="checkbox" ${s.bg_check_done ? 'checked' : ''} onchange="setBgCheck(${s.staff_id}, this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:#1a7a3a">
+              <span style="font-size:0.72rem;color:${s.bg_check_done ? '#1a7a3a' : '#aaa'}">${s.bg_check_done ? 'Done' : 'Pending'}</span>
+            </label>
           </td>
           <td style="white-space:nowrap">${staffConfirmedBadge}</td>
         </tr>
@@ -631,6 +631,10 @@ async function sendAllConfirmations() {
   }
   btn.disabled = false;
   btn.textContent = 'Send All Confirmation Emails';
+}
+
+async function setBgCheck(staffId, done) {
+  await fetch('/api/admin/bg-check', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ staff_id: staffId, done }) });
 }
 
 async function resendConfirmation(staffId, camp) {
