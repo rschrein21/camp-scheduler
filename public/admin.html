@@ -28,6 +28,7 @@
 
   /* Camp view */
   .camp-section { background: #fff; border-radius: 10px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .camp-hdr { padding: 12px 16px; background: #f8f8f8; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
   .camp-hdr h3 { font-size: 0.92rem; font-weight: 700; }
   .need-badge { font-size: 0.78rem; color: #888; }
@@ -365,7 +366,7 @@ function renderCamps() {
     if (staffArr.length === 0) {
       html += `<div class="empty">No requests yet</div>`;
     } else {
-      html += `<table class="sched">
+      html += `<div class="table-scroll"><table class="sched">
         <thead><tr>
           <th class="name-col">Staff</th>
           <th>Age Pref</th>
@@ -447,7 +448,7 @@ function renderCamps() {
           </td>
         </tr>`;
       });
-      html += `</tbody></table>`;
+      html += `</tbody></table></div>`;
     }
     html += `</div>`;
   });
