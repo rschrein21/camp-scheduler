@@ -32,6 +32,7 @@
 
   /* Camp cards */
   .camp-section { background: #fff; border-radius: 10px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .camp-hdr { padding: 12px 16px; background: #f8f8f8; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; }
   .camp-hdr h3 { font-size: 0.92rem; font-weight: 700; }
   .staff-count { font-size: 0.8rem; color: #888; font-weight: 600; }
@@ -242,7 +243,7 @@ function renderRoster() {
         <h3>${campName}</h3>
         <span class="staff-count">${staffArr.length} staff confirmed</span>
       </div>
-      <table class="sched">
+      <div class="table-scroll"><table class="sched">
         <thead><tr>
           <th>Name</th>
           <th>Email</th>
@@ -273,7 +274,7 @@ function renderRoster() {
       </tr>`;
     });
 
-    html += `</tbody></table></div>`;
+    html += `</tbody></table></div></div>`;
   });
 
   document.getElementById('rosterView').innerHTML = html;
@@ -302,7 +303,7 @@ function renderHours() {
         <h3>${campName}</h3>
         <span class="staff-count">${staffArr.length} staff</span>
       </div>
-      <table class="sched">
+      <div class="table-scroll"><table class="sched">
         <thead><tr>
           <th>Name</th>
           <th>Phone</th>
@@ -344,7 +345,7 @@ function renderHours() {
       <td class="center" id="total-${campName.replace(/[^a-z0-9]/gi,'_')}"><strong>${totalHours.toFixed(1)}</strong></td>
       <td colspan="2"></td>
     </tr>`;
-    html += `</tbody></table></div>`;
+    html += `</tbody></table></div></div>`;
   });
 
   document.getElementById('hoursView').innerHTML = html;
@@ -400,7 +401,7 @@ function renderRatings() {
         <h3>${campName}</h3>
         <span class="staff-count">${staffArr.length} staff</span>
       </div>
-      <table class="sched">
+      <div class="table-scroll"><table class="sched">
         <thead><tr>
           <th>Name</th>
           <th class="center">Rating</th>
@@ -434,7 +435,7 @@ function renderRatings() {
       </tr>`;
     });
 
-    html += `</tbody></table></div>`;
+    html += `</tbody></table></div></div>`;
   });
 
   document.getElementById('ratingsView').innerHTML = html;
