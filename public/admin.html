@@ -475,7 +475,7 @@ function renderCamps() {
               const ua = s.schedule_updated_at   ? new Date(s.schedule_updated_at)   : null;
               if (s.overallStatus !== 'confirmed') return '<span style="color:#ccc">—</span>';
               if (ca && (!ua || ca > ua)) return '<span style="color:#1a7a3a;font-weight:700">✅ Confirmed</span>';
-              if (ua) return '<span style="color:#e07000;font-weight:700">✏️ Updated</span><br><span style="color:#aaa;font-size:0.68rem">needs review</span>';
+              if (ua) return `<button onclick="toggleDetails('${detailId}')" style="background:none;border:none;cursor:pointer;text-align:center;padding:0"><span style="color:#e07000;font-weight:700">✏️ Updated</span><br><span style="color:#0066cc;font-size:0.68rem;text-decoration:underline">review changes</span></button>`;
               return '<span style="color:#aaa">⧓ Awaiting</span>';
             })()}
           </td>
