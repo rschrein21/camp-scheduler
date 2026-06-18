@@ -260,6 +260,19 @@ if (IS_PG) {
     await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS cancel_reason TEXT`);
     await pool.query(`ALTER TABLE staff ADD COLUMN IF NOT EXISTS schedule_confirmed_at TIMESTAMP`);
     await pool.query(`ALTER TABLE staff ADD COLUMN IF NOT EXISTS schedule_updated_at TIMESTAMP`);
+    // Backfill schedule_confirmed_at from old staff_confirmations table (one-time)
+    await pool.query(`
+      UPDATE staff s
+      SET schedule_confirmed_at = sc.confirmed_at
+      FROM (
+        SELECT DISTINCT ON (staff_id) staff_id, confirmed_at
+        FROM staff_confirmations
+        WHERE confirmed = TRUE AND confirmed_at IS NOT NULL
+        ORDER BY staff_id, confirmed_at DESC
+      ) sc
+      WHERE sc.staff_id = s.id
+      AND s.schedule_confirmed_at IS NULL
+    `);
     // Allow multiple directors per camp per role — drop camp+role unique, enforce director+camp unique
     await pool.query(`ALTER TABLE director_assignments DROP CONSTRAINT IF EXISTS director_assignments_camp_role_key`);
     await pool.query(`
