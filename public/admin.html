@@ -101,6 +101,19 @@
 </head>
 <body>
 
+<!-- Sub picker modal -->
+<div id="subPickerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;margin:20px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h3 style="font-size:1rem" id="subPickerTitle">Shift Cancelled</h3>
+      <button onclick="closeSubPicker()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#aaa">&times;</button>
+    </div>
+    <p style="font-size:0.82rem;color:#555;margin-bottom:14px" id="subPickerDesc"></p>
+    <div id="subPickerList"></div>
+    <div id="subPickerEmpty" style="display:none;font-size:0.82rem;color:#aaa;text-align:center;padding:16px">No subs on the list for this camp.</div>
+  </div>
+</div>
+
 <div id="loginScreen">
   <div class="login-card">
     <h2>⚽ Admin Login</h2>
@@ -313,9 +326,7 @@ function renderCamps() {
     campMap[row.camp][key].days[row.day] = {
       shift: row.shift, confirmed_shift: row.confirmed_shift,
       req_id: row.req_id, status: row.status,
-      cancel_requested: row.cancel_requested, cancel_reason: row.cancel_reason
     };
-    if (row.cancel_requested) campMap[row.camp][key].hasCancelRequest = true;
     if (row.confirmed_shift) campMap[row.camp][key].confirmedShift = row.confirmed_shift;
     // overallStatus: confirmed > pending > declined
     const cur = campMap[row.camp][key].overallStatus;
@@ -427,10 +438,9 @@ function renderCamps() {
         const dclass = dropdownClass(dval);
         const safecamp = campName.replace(/'/g, "\\'");
         const detailId = `detail-${s.staff_id}-${campName.replace(/[^a-z0-9]/gi,'_')}`;
-        const cancelAlert = s.hasCancelRequest ? `<span style="font-size:0.7rem;background:#fff3cd;color:#856404;padding:1px 6px;border-radius:8px;margin-left:4px">⚠️ Cancel req</span>` : '';
         html += `<tr>
           <td class="name-col">
-            <strong>${s.name}</strong>${cancelAlert}<br>
+            <strong>${s.name}</strong><br>
             <span style="font-size:0.73rem;color:#aaa">${s.email}</span>
           </td>
           <td><span class="role-badge">${s.preferred_role || '?'}</span></td>
@@ -440,12 +450,10 @@ function renderCamps() {
             if (!day) return `<td>${dayBadge(null, false, d)}</td>`;
             const effShift = day.confirmed_shift || day.shift;
             const cancelled = day.status === 'cancelled';
-            if (day.cancel_requested) {
-              const reasonTip = day.cancel_reason ? ` title="Reason: ${day.cancel_reason}"` : '';
+            if (day.status === 'confirmed') {
               return `<td style="text-align:center">
-                <div style="font-size:0.7rem;background:#fff3cd;color:#856404;padding:2px 5px;border-radius:4px;margin-bottom:3px"${reasonTip}>⚠️ ${effShift.toUpperCase()}</div>
-                <button onclick="resolveCancel(${day.req_id},'approve')" style="font-size:0.65rem;padding:2px 5px;background:#d4edda;border:1px solid #c3e6cb;border-radius:3px;cursor:pointer;margin:1px">Approve</button>
-                <button onclick="resolveCancel(${day.req_id},'reject')" style="font-size:0.65rem;padding:2px 5px;background:#f8d7da;border:1px solid #f5c6cb;border-radius:3px;cursor:pointer;margin:1px">Reject</button>
+                ${dayBadge(effShift, false, d)}
+                <button onclick="adminCancelShift(${day.req_id})" style="font-size:0.6rem;color:#cc0000;background:none;border:none;cursor:pointer;display:block;margin:2px auto 0;padding:0">Cancel</button>
               </td>`;
             }
             return `<td>${dayBadge(effShift, cancelled, d)}</td>`;
@@ -695,14 +703,57 @@ async function setBgCheck(staffId, done) {
   await fetch('/api/admin/bg-check', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ staff_id: staffId, done }) });
 }
 
-async function resolveCancel(reqId, action) {
-  const label = action === 'approve' ? 'Approve this cancellation?' : 'Reject this cancellation request?';
-  if (!confirm(label)) return;
-  const res = await fetch('/api/admin/resolve-cancel', {
+async function adminCancelShift(reqId) {
+  if (!confirm('Cancel this confirmed shift? The staff member will be texted.')) return;
+  const res = await fetch('/api/admin/cancel-shift-admin', {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ req_id: reqId, action })
+    body: JSON.stringify({ req_id: reqId })
   });
-  if (res.ok) { load(); } else { alert('Error resolving cancellation.'); }
+  if (!res.ok) { alert('Error cancelling shift.'); return; }
+  const data = await res.json();
+  load(); // refresh table
+  // Show sub picker
+  document.getElementById('subPickerTitle').textContent = 'Shift Cancelled — Pick a Sub';
+  document.getElementById('subPickerDesc').textContent =
+    `${data.shift.toUpperCase()} on ${data.day} at ${data.camp}. Choose someone from the sub list to send an offer.`;
+  const listEl = document.getElementById('subPickerList');
+  const emptyEl = document.getElementById('subPickerEmpty');
+  const subs = data.sub_candidates || [];
+  if (!subs.length) {
+    listEl.innerHTML = '';
+    emptyEl.style.display = 'block';
+  } else {
+    emptyEl.style.display = 'none';
+    listEl.innerHTML = subs.map(s => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0">
+        <div>
+          <strong style="font-size:0.88rem">${s.name}</strong>
+          <div style="font-size:0.73rem;color:#888">${'★'.repeat(s.rating)}${'\u2606'.repeat(5-s.rating)}</div>
+        </div>
+        <button id="offer-btn-${s.staff_id}" onclick="sendSubOffer(${s.staff_id},'${data.camp.replace(/'/g,"\\'")}',' ${data.day}','${data.shift}')" style="background:#111;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer">Send Offer</button>
+      </div>
+    `).join('');
+  }
+  document.getElementById('subPickerModal').style.display = 'flex';
+}
+
+async function sendSubOffer(staffId, camp, day, shift) {
+  const btn = document.getElementById(`offer-btn-${staffId}`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  const res = await fetch('/api/admin/offer-sub', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ sub_staff_id: staffId, camp, day, shift })
+  });
+  if (res.ok) {
+    if (btn) { btn.textContent = '✅ Sent'; btn.style.background = '#1a7a3a'; }
+  } else {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send Offer'; }
+    alert('Failed to send offer.');
+  }
+}
+
+function closeSubPicker() {
+  document.getElementById('subPickerModal').style.display = 'none';
 }
 
 async function resendConfirmation(staffId, camp) {

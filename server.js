@@ -523,6 +523,72 @@ app.post('/api/director/update-availability', async (req, res) => {
   }
 });
 
+// POST /api/admin/cancel-shift-admin — admin cancels a confirmed shift + texts staff
+app.post('/api/admin/cancel-shift-admin', requireAdmin, async (req, res) => {
+  try {
+    const { req_id } = req.body;
+    if (!req_id) return res.status(400).json({ error: 'req_id required' });
+    const rows = await query(
+      "SELECT r.*, s.name, s.phone, s.email FROM requests r JOIN staff s ON r.staff_id = s.id WHERE r.id = $1 AND r.status = 'confirmed'",
+      [req_id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Confirmed shift not found' });
+    const { camp, day, shift, confirmed_shift, name, phone } = rows[0];
+    if (IS_PG) {
+      await query("UPDATE requests SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1", [req_id]);
+    } else {
+      await query("UPDATE requests SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP WHERE id = $1", [req_id]);
+    }
+    // Text the cancelled staff member
+    if (twilioClient && phone) {
+      const digits = phone.replace(/\D/g, '');
+      const e164 = digits.length === 10 ? `+1${digits}` : `+${digits}`;
+      await twilioClient.messages.create({
+        body: `Nike Soccer Camps: Your ${confirmed_shift || shift} shift on ${day} at ${camp} has been cancelled by Coach Rich. Questions? Text Rich directly.`,
+        from: TWILIO_FROM_NUMBER, to: e164
+      }).catch(e => console.warn('Cancel SMS failed:', e.message));
+    }
+    // Return sub candidates (sub_list = TRUE for this camp, excluding cancelled staff)
+    const subs = await query(`
+      SELECT DISTINCT ON (s.id) s.id as staff_id, s.name, s.phone, COALESCE(sr.rating, 3) as rating
+      FROM requests r
+      JOIN staff s ON r.staff_id = s.id
+      LEFT JOIN staff_ratings sr ON s.id = sr.staff_id
+      WHERE r.camp = $1 AND r.sub_list = TRUE AND r.staff_id != $2
+      ORDER BY s.id, sr.rating DESC
+    `, [camp, rows[0].staff_id]);
+    res.json({ ok: true, camp, day, shift: confirmed_shift || shift, sub_candidates: subs });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/admin/offer-sub — text a sub an offer for an open shift
+app.post('/api/admin/offer-sub', requireAdmin, async (req, res) => {
+  try {
+    const { sub_staff_id, camp, day, shift } = req.body;
+    if (!sub_staff_id || !camp || !day || !shift) return res.status(400).json({ error: 'Missing fields' });
+    const rows = await query('SELECT name, phone FROM staff WHERE id = $1', [sub_staff_id]);
+    if (!rows.length) return res.status(404).json({ error: 'Staff not found' });
+    const { name, phone } = rows[0];
+    if (twilioClient && phone) {
+      const digits = phone.replace(/\D/g, '');
+      const e164 = digits.length === 10 ? `+1${digits}` : `+${digits}`;
+      await twilioClient.messages.create({
+        body: `Nike Soccer Camps: Hi ${name}, a ${shift} shift opened up on ${day} at ${camp}. Interested? Reply YES and Coach Rich will confirm you.`,
+        from: TWILIO_FROM_NUMBER, to: e164
+      });
+      res.json({ ok: true });
+    } else {
+      res.json({ ok: false, reason: 'No SMS configured or no phone on file' });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /api/staff/confirm-schedule — staff taps "Looks good" on my-schedule
 app.post('/api/staff/confirm-schedule', async (req, res) => {
   try {
