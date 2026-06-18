@@ -393,6 +393,7 @@ app.get('/admin',    (req, res) => res.sendFile(path.join(__dirname, 'public', '
 app.get('/director', (req, res) => res.sendFile(path.join(__dirname, 'public', 'director.html')));
 app.get('/schedule', (req, res) => res.sendFile(path.join(__dirname, 'public', 'schedule.html')));
 app.get('/director-signup', (req, res) => res.sendFile(path.join(__dirname, 'public', 'director-signup.html')));
+app.get('/my-schedule',   (req, res) => res.sendFile(path.join(__dirname, 'public', 'my-schedule.html')));
 
 // ── Staff Submission ──────────────────────────────────────
 app.post('/api/submit', async (req, res) => {
@@ -465,9 +466,15 @@ app.post('/api/internal/mark-sent', async (req, res) => {
 // ── Staff Lookup ──────────────────────────────────────────
 app.get('/api/staff/lookup', async (req, res) => {
   try {
-    const { email } = req.query;
-    if (!email) return res.status(400).json({ error: 'Email required' });
-    const rows = await query('SELECT * FROM staff WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+    const { email, phone } = req.query;
+    if (!email && !phone) return res.status(400).json({ error: 'Email or phone required' });
+    let rows;
+    if (phone) {
+      const digits = phone.replace(/\D/g, '');
+      rows = await query('SELECT * FROM staff WHERE regexp_replace(phone, $1, $2, $3) = $4', ['[^0-9]', '', 'g', digits.slice(-10)]);
+    } else {
+      rows = await query('SELECT * FROM staff WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+    }
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     const staff = rows[0];
     const requests = await query("SELECT camp, day, shift, status, confirmed_shift FROM requests WHERE staff_id = $1 AND (status IS NULL OR status != 'cancelled')", [staff.id]);
@@ -480,9 +487,15 @@ app.get('/api/staff/lookup', async (req, res) => {
 // POST /api/staff/update-summer — update full summer availability (preserves confirmed shifts)
 app.post('/api/staff/update-summer', async (req, res) => {
   try {
-    const { email, shifts } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email required' });
-    const rows = await query('SELECT id, name FROM staff WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+    const { email, phone, shifts } = req.body;
+    if (!email && !phone) return res.status(400).json({ error: 'Email or phone required' });
+    let rows;
+    if (phone) {
+      const digits = phone.replace(/\D/g, '');
+      rows = await query('SELECT id, name FROM staff WHERE regexp_replace(phone, $1, $2, $3) = $4', ['[^0-9]', '', 'g', digits.slice(-10)]);
+    } else {
+      rows = await query('SELECT id, name FROM staff WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+    }
     if (!rows.length) return res.status(404).json({ error: 'Staff not found' });
     const { id: staffId, name: staffName } = rows[0];
     // Delete only non-confirmed requests so confirmed shifts are preserved

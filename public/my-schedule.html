@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>My Summer Schedule — Nike Soccer Camp</title>
+<meta name="description" content="View and update your Nike Soccer Camp summer schedule">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #222; }
@@ -103,12 +104,12 @@
 
   <!-- Lookup card -->
   <div class="card" id="lookupCard">
-    <p class="lookup-desc">Enter your email to view and update your full summer schedule.</p>
+    <p class="lookup-desc">Enter your phone number to view and update your full summer schedule.</p>
     <div class="lookup-row">
-      <input type="email" id="emailInput" placeholder="your@email.com" onkeydown="if(event.key==='Enter')loadSchedule()">
+      <input type="tel" id="phoneInput" placeholder="e.g. 206-555-1234" onkeydown="if(event.key==='Enter')loadSchedule()">
       <button class="lookup-btn" onclick="loadSchedule()">Load</button>
     </div>
-    <div class="lookup-err" id="lookupErr">No record found for that email.
+    <div class="lookup-err" id="lookupErr">No record found for that number.
       <a href="/" style="color:#0066cc;margin-left:4px">Submit availability →</a>
     </div>
   </div>
@@ -173,20 +174,20 @@ let campState = {};
 // Auto-load from URL ?email= param
 window.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
-  const email = params.get('email');
-  if (email) {
-    document.getElementById('emailInput').value = email;
+  const phone = params.get('phone');
+  if (phone) {
+    document.getElementById('phoneInput').value = phone;
     loadSchedule();
   }
 });
 
 async function loadSchedule() {
-  const email = document.getElementById('emailInput').value.trim();
-  if (!email) return;
+  const phone = document.getElementById('phoneInput').value.trim();
+  if (!phone) return;
   const errEl = document.getElementById('lookupErr');
   errEl.style.display = 'none';
 
-  const res = await fetch('/api/staff/lookup?email=' + encodeURIComponent(email));
+  const res = await fetch('/api/staff/lookup?phone=' + encodeURIComponent(phone));
   if (!res.ok) {
     errEl.style.display = 'block';
     return;
@@ -207,7 +208,7 @@ async function loadSchedule() {
   });
 
   document.getElementById('staffName').textContent = staff.name;
-  document.getElementById('staffEmail').textContent = staff.email;
+  document.getElementById('staffEmail').textContent = staff.phone || staff.email;
   document.getElementById('lookupCard').style.display = 'none';
   document.getElementById('scheduleSection').style.display = '';
   renderCamps();
@@ -281,6 +282,7 @@ function resetLookup() {
   document.getElementById('lookupCard').style.display = '';
   document.getElementById('scheduleSection').style.display = 'none';
   document.getElementById('emailInput').value = '';
+  document.getElementById('phoneInput').value = '';
   history.replaceState(null, '', location.pathname);
 }
 
@@ -310,7 +312,7 @@ async function saveSchedule() {
     const res = await fetch('/api/staff/update-summer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: currentStaff.email, shifts })
+      body: JSON.stringify({ phone: currentStaff.phone, shifts })
     });
 
     if (res.ok) {
