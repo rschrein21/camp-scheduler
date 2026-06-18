@@ -476,11 +476,45 @@ app.get('/api/staff/lookup', async (req, res) => {
     } else {
       rows = await query('SELECT * FROM staff WHERE LOWER(email) = LOWER($1)', [email.trim()]);
     }
-    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    if (!rows.length) {
+      // Not found in staff — check directors
+      let dirRows;
+      if (phone) {
+        const digits = phone.replace(/\D/g, '');
+        dirRows = await query('SELECT * FROM directors WHERE regexp_replace(phone, $1, $2, $3) = $4', ['[^0-9]', '', 'g', digits.slice(-10)]);
+      } else {
+        dirRows = await query('SELECT * FROM directors WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+      }
+      if (!dirRows.length) return res.status(404).json({ error: 'Not found' });
+      const director = dirRows[0];
+      const assignments = await query('SELECT camp, role FROM director_assignments WHERE director_id = $1 ORDER BY camp', [director.id]);
+      const availability = await query('SELECT camp, role FROM director_availability WHERE director_id = $1 ORDER BY camp', [director.id]);
+      return res.json({ director, assignments, availability, type: 'director' });
+    }
     const staff = rows[0];
     const requests = await query("SELECT camp, day, shift, status, confirmed_shift FROM requests WHERE staff_id = $1 AND (status IS NULL OR status != 'cancelled')", [staff.id]);
-    res.json({ staff, requests });
+    res.json({ staff, requests, type: 'staff' });
   } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/director/update-availability — update director camp availability (by phone)
+app.post('/api/director/update-availability', async (req, res) => {
+  try {
+    const { phone, camps } = req.body; // camps: [{camp, role}]
+    if (!phone) return res.status(400).json({ error: 'Phone required' });
+    const digits = phone.replace(/\D/g, '');
+    const rows = await query('SELECT id, name FROM directors WHERE regexp_replace(phone, $1, $2, $3) = $4', ['[^0-9]', '', 'g', digits.slice(-10)]);
+    if (!rows.length) return res.status(404).json({ error: 'Director not found' });
+    const { id: dirId } = rows[0];
+    await query('DELETE FROM director_availability WHERE director_id = $1', [dirId]);
+    for (const c of (camps || [])) {
+      await query('INSERT INTO director_availability (director_id, camp, role) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', [dirId, c.camp, c.role || 'skills']);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });

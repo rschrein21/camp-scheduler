@@ -193,7 +193,7 @@
     <div id="campsContainer"></div>
 
     <div class="save-bar">
-      <button class="save-btn" id="saveBtn" onclick="saveSchedule()">Save Changes</button>
+      <button class="save-btn" id="saveBtn" onclick="isDirector ? saveDirectorSchedule() : saveSchedule()">Save Changes</button>
       <div class="save-msg save-ok" id="saveOk">✅ Schedule updated!</div>
       <div class="save-msg save-err" id="saveErr">Something went wrong. Please try again.</div>
     </div>
@@ -257,7 +257,19 @@ async function loadSchedule() {
     return;
   }
 
-  const { staff, requests } = await res.json();
+  const payload = await res.json();
+
+  if (payload.type === 'director') {
+    currentStaff = payload.director;
+    document.getElementById('staffName').textContent = payload.director.name;
+    document.getElementById('staffEmail').textContent = payload.director.phone || payload.director.email || '';
+    document.getElementById('lookupCard').style.display = 'none';
+    document.getElementById('scheduleSection').style.display = '';
+    renderDirectorCamps(payload.assignments || [], payload.availability || []);
+    return;
+  }
+
+  const { staff, requests } = payload;
   currentStaff = staff;
 
   // Build campState
@@ -343,10 +355,12 @@ function onShiftChange(el) {
 function resetLookup() {
   currentStaff = null;
   campState = {};
+  isDirector = false;
   document.getElementById('lookupCard').style.display = '';
   document.getElementById('scheduleSection').style.display = 'none';
   document.getElementById('newUserSection').style.display = 'none';
   document.getElementById('phoneInput').value = '';
+  document.getElementById('saveBtn').textContent = 'Save Changes';
   history.replaceState(null, '', location.pathname);
 }
 
@@ -478,6 +492,93 @@ async function saveSchedule() {
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save Changes';
+  }
+}
+
+// ── Director view ──────────────────────────────────────────
+let isDirector = false;
+
+function renderDirectorCamps(assignments, availability) {
+  isDirector = true;
+  // Build lookup maps
+  const assignMap = {}; // camp -> role (confirmed)
+  assignments.forEach(a => { assignMap[a.camp] = a.role; });
+  const availMap = {}; // camp -> role (preference)
+  availability.forEach(a => { availMap[a.camp] = a.role; });
+
+  let html = '';
+  let lastWeek = null;
+  CAMP_ORDER.forEach(camp => {
+    const week = weekOf(camp);
+    if (week !== lastWeek) {
+      html += `<div class="week-divider">${week}</div>`;
+      lastWeek = week;
+    }
+    const assigned = assignMap[camp]; // 'skills' | 'admin' | undefined
+    const avail = availMap[camp];
+    const selId = `dir_${slug(camp)}`;
+
+    html += `<div class="camp-block">
+      <div class="camp-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>${camp}</span>
+        ${assigned ? `<span style="font-size:0.72rem;font-weight:700;background:${assigned==='admin'?'#dbeafe':'#fef3c7'};color:${assigned==='admin'?'#1d4ed8':'#92400e'};padding:2px 8px;border-radius:8px">✅ ${assigned==='admin'?'Admin':'Skills'} Dir</span>` : ''}
+      </div>
+      <div style="padding:8px 12px">
+        <label style="font-size:0.78rem;color:#666;font-weight:600;display:block;margin-bottom:5px">My Availability:</label>`;
+
+    if (assigned) {
+      html += `<div style="font-size:0.8rem;color:#888;font-style:italic">Assigned — contact Rich to change.</div>`;
+    } else {
+      const val = avail || '';
+      html += `<select id="${selId}" class="shift-sel" style="max-width:200px" onchange="onShiftChange(this)">
+        <option value="">Not available</option>
+        <option value="skills" ${val==='skills'?'selected':''}>Available — Skills Director</option>
+        <option value="admin"  ${val==='admin' ?'selected':''}>Available — Admin Director</option>
+        <option value="either" ${val==='either'?'selected':''}>Available — Either Role</option>
+      </select>`;
+    }
+
+    html += `</div></div>`;
+  });
+
+  document.getElementById('campsContainer').innerHTML = html;
+
+  // Update save button
+  document.getElementById('saveBtn').textContent = 'Save Availability';
+}
+
+async function saveDirectorSchedule() {
+  const saveOk  = document.getElementById('saveOk');
+  const saveErr = document.getElementById('saveErr');
+  const saveBtn = document.getElementById('saveBtn');
+  saveOk.style.display = 'none';
+  saveErr.style.display = 'none';
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+
+  const camps = [];
+  CAMP_ORDER.forEach(camp => {
+    const el = document.getElementById(`dir_${slug(camp)}`);
+    if (el && el.value) camps.push({ camp, role: el.value });
+  });
+
+  try {
+    const res = await fetch('/api/director/update-availability', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: currentStaff.phone, camps })
+    });
+    if (res.ok) {
+      saveOk.style.display = 'block';
+      setTimeout(() => { saveOk.style.display = 'none'; }, 3000);
+    } else {
+      saveErr.style.display = 'block';
+    }
+  } catch (e) {
+    saveErr.style.display = 'block';
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Availability';
   }
 }
 </script>
