@@ -375,10 +375,11 @@ function renderCamps() {
     const makeSummaryRow = () => {
       const cells = DAYS.map(d => {
         const c = dayCount[d];
+        const amTotal = c.full + c.am;
+        const pmTotal = c.full + c.pm;
         const parts = [];
-        if (c.full) parts.push('<span style="color:#1a7a3a;font-weight:700">F:'+c.full+'</span>');
-        if (c.am)   parts.push('<span style="color:#0066cc;font-weight:700">AM:'+c.am+'</span>');
-        if (c.pm)   parts.push('<span style="color:#8844cc;font-weight:700">PM:'+c.pm+'</span>');
+        if (amTotal) parts.push('<span style="color:#0066cc;font-weight:700">AM '+amTotal+' <span style="font-weight:400">('+c.am+')</span></span>');
+        if (pmTotal) parts.push('<span style="color:#8844cc;font-weight:700">PM '+pmTotal+' <span style="font-weight:400">('+c.pm+')</span></span>');
         return '<td style="text-align:center;background:#f0f6ff;padding:4px 2px">'+(parts.length ? parts.join('<br>') : '<span style="color:#ccc">—</span>')+'</td>';
       }).join('');
       return `<tr style="font-size:0.72rem">
