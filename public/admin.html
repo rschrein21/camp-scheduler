@@ -454,10 +454,10 @@ function renderCamps() {
           }).join('')}
           <td>
             <select class="status-select ${dclass}" onchange="updateStatus(${s.staff_id}, '${safecamp}', this)">
-              <option value="pending"      ${dval==='pending'      ?'selected':''}>Pending</option>
-              <option value="confirmed"    ${dval==='confirmed'    ?'selected':''}>✅ Full Week</option>
-              <option value="confirmed_am" ${dval==='confirmed_am' ?'selected':''}>✅ AM Only</option>
-              <option value="confirmed_pm" ${dval==='confirmed_pm' ?'selected':''}>✅ PM Only</option>
+              <option value="pending"      ${dval==='pending'      ?'selected':''}>Availability received</option>
+              <option value="confirmed"    ${dval==='confirmed'    ?'selected':''}>Assigned — Full Week</option>
+              <option value="confirmed_am" ${dval==='confirmed_am' ?'selected':''}>Assigned — AM Only</option>
+              <option value="confirmed_pm" ${dval==='confirmed_pm' ?'selected':''}>Assigned — PM Only</option>
               <option value="declined"     ${dval==='declined'     ?'selected':''}>❌ Declined</option>
             </select>
             <button class="detail-btn" onclick="toggleDetails('${detailId}')">Details ▾</button>

@@ -175,8 +175,8 @@
 
     <!-- Confirm banner (shown when staff have confirmed shifts) -->
     <div id="confirmBanner" style="display:none;background:#f0fff5;border:1px solid #a3e6c0;border-radius:10px;padding:14px 18px;margin-bottom:12px;align-items:center;justify-content:space-between;gap:12px">
-      <div style="font-size:0.85rem;color:#1a5c36">✅ <strong>Everything look right?</strong> Tap to confirm your schedule.</div>
-      <button onclick="confirmSchedule()" style="background:#1a7a3a;color:#fff;border:none;padding:9px 16px;border-radius:6px;font-size:0.85rem;font-weight:700;cursor:pointer;white-space:nowrap;margin-top:8px">Confirm My Schedule</button>
+      <div style="font-size:0.85rem;color:#1a5c36">✅ You've been assigned. Tap to confirm you're good to go.</div>
+      <button onclick="confirmSchedule()" style="background:#1a7a3a;color:#fff;border:none;padding:9px 16px;border-radius:6px;font-size:0.85rem;font-weight:700;cursor:pointer;white-space:nowrap;margin-top:8px">Confirm</button>
     </div>
     <div id="confirmedBanner" style="display:none;background:#f0fff5;border:1px solid #a3e6c0;border-radius:10px;padding:14px 18px;margin-bottom:12px">
       <span style="font-size:0.85rem;color:#1a5c36">✅ <strong>Schedule confirmed!</strong> We’ll reach out if anything changes.</span>
@@ -298,7 +298,12 @@ async function loadSchedule() {
   );
   document.getElementById('confirmBanner').style.display = hasConfirmed ? 'flex' : 'none';
   document.getElementById('confirmedBanner').style.display = 'none';
-  document.getElementById('staffStatus').textContent = hasConfirmed ? 'Fully confirmed' : '';
+  // Show Assigned vs Confirmed status
+  const hasStaffConfirmed = !!staff.schedule_confirmed_at;
+  document.getElementById('staffStatus').textContent = hasConfirmed
+    ? (hasStaffConfirmed ? 'Confirmed' : 'Assigned')
+    : '';
+  document.getElementById('staffStatus').style.color = hasStaffConfirmed ? '#1a7a3a' : '#0066cc';
   document.getElementById('cancelNote').style.display = hasConfirmed ? 'block' : 'none';
   renderCamps();
 }
@@ -336,7 +341,7 @@ function renderCamps() {
         const shift = s.shift;
         const cls = shift === 'full' ? 'conf-full' : shift === 'am' ? 'conf-am' : 'conf-pm';
         const label = shift === 'full' ? 'Full' : shift.toUpperCase();
-        html += `<div class="conf-badge ${cls}">${label}<span class="conf-sub">✓ set</span></div>`;
+        html += `<div class="conf-badge ${cls}">${label}<span class="conf-sub">Assigned</span></div>`;
       } else {
         const val = s ? s.shift : '';
         const selId = `s_${slug(camp)}_${d}`;
