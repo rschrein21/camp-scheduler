@@ -494,9 +494,18 @@ function renderCamps() {
                 const selCS = day.status === 'confirmed'
                   ? (day.confirmed_shift || day.shift)
                   : '';
-                return `<tr>
+                const confirmed = day.status === 'confirmed' ? (day.confirmed_shift || day.shift) : null;
+                const submitted = day.shift;
+                const changed = confirmed && submitted && submitted !== confirmed;
+                const isNew = !confirmed && day.status === 'pending';
+                const changeLabel = changed
+                  ? `<span style="font-size:0.7rem;background:#fff3cd;color:#856404;padding:1px 6px;border-radius:4px;margin-left:4px">⚠️ ${confirmed.toUpperCase()} → ${submitted.toUpperCase()}</span>`
+                  : isNew
+                    ? `<span style="font-size:0.7rem;background:#e8f4ff;color:#004499;padding:1px 6px;border-radius:4px;margin-left:4px">New: ${submitted.toUpperCase()}</span>`
+                    : `<span style="font-size:0.7rem;color:#aaa;margin-left:4px">No change</span>`;
+                return `<tr style="${changed||isNew ? 'background:#fffdf0' : ''}">
                   <td style="width:50px;font-weight:700">${d}</td>
-                  <td style="width:80px;color:#aaa;font-size:0.75rem">Sub: ${dayBadge(day.shift, false, d)}</td>
+                  <td style="font-size:0.78rem">${changeLabel}</td>
                   <td>
                     <select style="padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:0.75rem;cursor:pointer" onchange="setDaySchedule(${day.req_id}, this.value)">
                       <option value=""    ${selCS===''    ?'selected':''}>— None</option>
