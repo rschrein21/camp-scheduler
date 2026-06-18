@@ -398,7 +398,17 @@ function renderCamps() {
       html += `<div class="empty">No requests yet</div>`;
     } else {
       html += `<div class="table-scroll"><table class="sched">
-        <thead><tr>
+        <thead>
+        <tr style="background:#eef3ff;border-bottom:1px solid #d0dfff">
+          <th class="name-col" colspan="3" style="padding:5px 10px"></th>
+          <th style="background:#eef3ff"></th>
+          <th style="background:#eef3ff"></th>
+          <th style="text-align:center;background:#eef3ff;padding:5px 4px;font-size:0.75rem;font-weight:700;color:#333">Need: <span style="color:#0066cc">AM ${need.am}</span> / <span style="color:#8844cc">PM ${need.pm}</span></th>
+          <th style="background:#eef3ff"></th>
+          <th style="background:#eef3ff"></th>
+          <th colspan="3" style="background:#eef3ff"></th>
+        </tr>
+        <tr>
           <th class="name-col">Staff</th>
           <th>Age Pref</th>
           <th>Rating</th>
