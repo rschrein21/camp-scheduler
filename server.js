@@ -1033,12 +1033,22 @@ app.post('/api/admin/cleanup-dupes', requireAdmin, async (req, res) => {
     const result = await query(`
       DELETE FROM requests
       WHERE id NOT IN (
-        SELECT MIN(id) FROM requests
+        SELECT MAX(id) FROM requests
         GROUP BY staff_id, camp, day
       )
     `);
     res.json({ ok: true, deleted: result.length || 0 });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/admin/delete-requests — delete specific request rows by ID (non-confirmed only)
+app.post('/api/admin/delete-requests', requireAdmin, async (req, res) => {
+  try {
+    const { ids } = req.body; // array of req IDs
+    if (!ids || !ids.length) return res.status(400).json({ error: 'ids required' });
+    await query(`DELETE FROM requests WHERE id = ANY($1) AND status NOT IN ('confirmed')`, [ids]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
 // POST /api/admin/bg-check — toggle background check done for a staff member
