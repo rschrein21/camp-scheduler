@@ -190,6 +190,15 @@
   <!-- Schedule section (hidden until loaded) -->
   <div id="scheduleSection" style="display:none">
 
+    <!-- Confirm banner (shown when staff have confirmed shifts) -->
+    <div id="confirmBanner" style="display:none;background:#f0fff5;border:1px solid #a3e6c0;border-radius:10px;padding:14px 18px;margin-bottom:12px;align-items:center;justify-content:space-between;gap:12px">
+      <div style="font-size:0.85rem;color:#1a5c36">✅ <strong>Everything look right?</strong> Tap to confirm your schedule.</div>
+      <button onclick="confirmSchedule()" style="background:#1a7a3a;color:#fff;border:none;padding:9px 16px;border-radius:6px;font-size:0.85rem;font-weight:700;cursor:pointer;white-space:nowrap;margin-top:8px">Confirm My Schedule</button>
+    </div>
+    <div id="confirmedBanner" style="display:none;background:#f0fff5;border:1px solid #a3e6c0;border-radius:10px;padding:14px 18px;margin-bottom:12px">
+      <span style="font-size:0.85rem;color:#1a5c36">✅ <strong>Schedule confirmed!</strong> We’ll reach out if anything changes.</span>
+    </div>
+
     <div class="card">
       <div class="staff-bar">
         <div>
@@ -305,6 +314,12 @@ async function loadSchedule() {
   document.getElementById('staffEmail').textContent = staff.phone || staff.email;
   document.getElementById('lookupCard').style.display = 'none';
   document.getElementById('scheduleSection').style.display = '';
+  // Show confirm banner if any confirmed shifts exist
+  const hasConfirmed = Object.values(campState).some(days =>
+    Object.values(days).some(d => d.status === 'confirmed')
+  );
+  document.getElementById('confirmBanner').style.display = hasConfirmed ? 'flex' : 'none';
+  document.getElementById('confirmedBanner').style.display = 'none';
   renderCamps();
 }
 
@@ -515,6 +530,23 @@ async function saveSchedule() {
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save Changes';
+  }
+}
+
+// ── Schedule confirmation ───────────────────────────────────
+async function confirmSchedule() {
+  try {
+    const res = await fetch('/api/staff/confirm-schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: currentStaff.phone })
+    });
+    if (res.ok) {
+      document.getElementById('confirmBanner').style.display = 'none';
+      document.getElementById('confirmedBanner').style.display = 'block';
+    }
+  } catch (e) {
+    console.error('Confirm failed:', e);
   }
 }
 

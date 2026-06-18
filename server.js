@@ -258,6 +258,8 @@ if (IS_PG) {
     await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS sub_list BOOLEAN NOT NULL DEFAULT FALSE`);
     await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS cancel_requested BOOLEAN NOT NULL DEFAULT FALSE`);
     await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS cancel_reason TEXT`);
+    await pool.query(`ALTER TABLE staff ADD COLUMN IF NOT EXISTS schedule_confirmed_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE staff ADD COLUMN IF NOT EXISTS schedule_updated_at TIMESTAMP`);
     // Allow multiple directors per camp per role — drop camp+role unique, enforce director+camp unique
     await pool.query(`ALTER TABLE director_assignments DROP CONSTRAINT IF EXISTS director_assignments_camp_role_key`);
     await pool.query(`
@@ -521,6 +523,22 @@ app.post('/api/director/update-availability', async (req, res) => {
   }
 });
 
+// POST /api/staff/confirm-schedule — staff taps "Looks good" on my-schedule
+app.post('/api/staff/confirm-schedule', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: 'Phone required' });
+    const digits = phone.replace(/\D/g, '');
+    const rows = await query('SELECT id FROM staff WHERE regexp_replace(phone, $1, $2, $3) = $4', ['[^0-9]', '', 'g', digits.slice(-10)]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    await query('UPDATE staff SET schedule_confirmed_at = NOW(), schedule_updated_at = NULL WHERE id = $1', [rows[0].id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /api/staff/request-cancel — staff requests to cancel a confirmed shift day
 app.post('/api/staff/request-cancel', async (req, res) => {
   try {
@@ -610,6 +628,8 @@ app.post('/api/staff/update-summer', async (req, res) => {
       await query('INSERT INTO requests (staff_id, camp, day, shift) VALUES ($1,$2,$3,$4)', [staffId, s.camp, s.day, s.shift]);
     }
     await query("INSERT INTO staff_notifications (staff_id, staff_name, action) VALUES ($1,$2,'updated')", [staffId, staffName]);
+    // Track update time + clear any prior confirmation
+    await query('UPDATE staff SET schedule_updated_at = NOW(), schedule_confirmed_at = NULL WHERE id = $1', [staffId]);
     res.json({ ok: true, message: 'Schedule updated!' });
   } catch (err) {
     console.error(err);
@@ -820,7 +840,7 @@ app.get('/api/admin/camps', requireAdmin, async (req, res) => {
       SELECT r.camp, r.day, r.shift, r.confirmed_shift, r.status, r.id as req_id,
              r.sub_list, r.cancel_requested, r.cancel_reason,
              s.name, s.email, s.phone, s.preferred_role, s.id as staff_id,
-             s.bg_check_done,
+             s.bg_check_done, s.schedule_confirmed_at, s.schedule_updated_at,
              COALESCE(sr.rating, 3) as rating
       FROM requests r
       JOIN staff s ON r.staff_id = s.id
