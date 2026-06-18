@@ -450,12 +450,6 @@ function renderCamps() {
             if (!day) return `<td>${dayBadge(null, false, d)}</td>`;
             const effShift = day.confirmed_shift || day.shift;
             const cancelled = day.status === 'cancelled';
-            if (day.status === 'confirmed') {
-              return `<td style="text-align:center">
-                ${dayBadge(effShift, false, d)}
-                <button onclick="adminCancelShift(${day.req_id})" style="font-size:0.6rem;color:#cc0000;background:none;border:none;cursor:pointer;display:block;margin:2px auto 0;padding:0">Cancel</button>
-              </td>`;
-            }
             return `<td>${dayBadge(effShift, cancelled, d)}</td>`;
           }).join('')}
           <td>
@@ -467,6 +461,7 @@ function renderCamps() {
               <option value="declined"     ${dval==='declined'     ?'selected':''}>❌ Declined</option>
             </select>
             <button class="detail-btn" onclick="toggleDetails('${detailId}')">Details ▾</button>
+            ${s.overallStatus === 'confirmed' ? `<button class="detail-btn" style="color:#cc0000;margin-top:3px" onclick="openAdjustDays(${s.staff_id}, '${safecamp}')">Adjust Days</button>` : ''}
           </td>
           <td style="text-align:center">
             <label title="Background check completed" style="cursor:pointer;display:flex;align-items:center;gap:5px;justify-content:center">
@@ -703,17 +698,35 @@ async function setBgCheck(staffId, done) {
   await fetch('/api/admin/bg-check', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ staff_id: staffId, done }) });
 }
 
+function openAdjustDays(staffId, camp) {
+  // Find staff in campMap
+  const staffRows = (data.camps || []).filter(r => r.staff_id === staffId && r.camp === camp && r.status === 'confirmed');
+  if (!staffRows.length) { alert('No confirmed shifts to adjust.'); return; }
+  const name = staffRows[0].name;
+  document.getElementById('subPickerTitle').textContent = `Adjust Days — ${name}`;
+  document.getElementById('subPickerDesc').textContent = `Click Cancel on any day to remove it and pick a sub from the list.`;
+  document.getElementById('subPickerEmpty').style.display = 'none';
+  document.getElementById('subPickerList').innerHTML = staffRows.map(r => {
+    const effShift = r.confirmed_shift || r.shift;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0">
+      <div><strong style="font-size:0.88rem">${r.day}</strong> <span style="font-size:0.8rem;color:#555">— ${effShift.toUpperCase()}</span></div>
+      <button onclick="adminCancelShift(${r.req_id})" style="background:#fff0f0;color:#cc0000;border:1px solid #ffcccc;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer">Cancel this day</button>
+    </div>`;
+  }).join('');
+  document.getElementById('subPickerModal').style.display = 'flex';
+}
+
 async function adminCancelShift(reqId) {
-  if (!confirm('Cancel this confirmed shift? The staff member will be texted.')) return;
+  if (!confirm('Cancel this shift? The staff member will be texted.')) return;
   const res = await fetch('/api/admin/cancel-shift-admin', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ req_id: reqId })
   });
   if (!res.ok) { alert('Error cancelling shift.'); return; }
   const data = await res.json();
-  load(); // refresh table
-  // Show sub picker
-  document.getElementById('subPickerTitle').textContent = 'Shift Cancelled — Pick a Sub';
+  load();
+  // Show sub picker for this cancelled day
+  document.getElementById('subPickerTitle').textContent = 'Pick a Sub';
   document.getElementById('subPickerDesc').textContent =
     `${data.shift.toUpperCase()} on ${data.day} at ${data.camp}. Choose someone from the sub list to send an offer.`;
   const listEl = document.getElementById('subPickerList');
