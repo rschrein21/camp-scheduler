@@ -186,15 +186,11 @@
       <div class="staff-bar">
         <div>
           <div class="staff-name" id="staffName"></div>
-          <div class="staff-email" id="staffEmail"></div>
+          <div style="font-size:0.8rem;color:#888;margin-top:2px" id="staffEmail"></div>
+          <div id="staffStatus" style="font-size:0.8rem;color:#1a7a3a;font-weight:600;margin-top:4px"></div>
+          <div id="cancelNote" style="display:none;font-size:0.78rem;color:#888;margin-top:4px">Text Coach Rich if you need to cancel a confirmed shift.</div>
         </div>
         <button class="change-btn" onclick="resetLookup()">Change</button>
-      </div>
-      <div class="legend">
-        <div class="leg-item"><div class="leg-dot" style="background:#dbeafe"></div> Full Day confirmed</div>
-        <div class="leg-item"><div class="leg-dot" style="background:#fef3c7"></div> AM confirmed</div>
-        <div class="leg-item"><div class="leg-dot" style="background:#ede9fe"></div> PM confirmed</div>
-        <div class="leg-item"><div class="leg-dot" style="background:#f5f5f5;border:1px solid #ddd"></div> Available to set</div>
       </div>
     </div>
 
@@ -296,12 +292,14 @@ async function loadSchedule() {
   document.getElementById('staffEmail').textContent = staff.phone || staff.email;
   document.getElementById('lookupCard').style.display = 'none';
   document.getElementById('scheduleSection').style.display = '';
-  // Show confirm banner if any confirmed shifts exist
+  // Show confirm banner + status if any confirmed shifts exist
   const hasConfirmed = Object.values(campState).some(days =>
     Object.values(days).some(d => d.status === 'confirmed')
   );
   document.getElementById('confirmBanner').style.display = hasConfirmed ? 'flex' : 'none';
   document.getElementById('confirmedBanner').style.display = 'none';
+  document.getElementById('staffStatus').textContent = hasConfirmed ? 'Fully confirmed' : '';
+  document.getElementById('cancelNote').style.display = hasConfirmed ? 'block' : 'none';
   renderCamps();
 }
 
@@ -338,8 +336,7 @@ function renderCamps() {
         const shift = s.shift;
         const cls = shift === 'full' ? 'conf-full' : shift === 'am' ? 'conf-am' : 'conf-pm';
         const label = shift === 'full' ? 'Full' : shift.toUpperCase();
-        html += `<div class="conf-badge ${cls}">${label}<span class="conf-sub">✓ set</span></div>
-            <div style="font-size:0.6rem;color:#aaa;margin-top:2px;text-align:center">Text Rich to cancel</div>`;
+        html += `<div class="conf-badge ${cls}">${label}<span class="conf-sub">✓ set</span></div>`;
       } else {
         const val = s ? s.shift : '';
         const selId = `s_${slug(camp)}_${d}`;
