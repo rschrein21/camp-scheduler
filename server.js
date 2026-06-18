@@ -1232,6 +1232,17 @@ app.post('/api/admin/send-all-confirmations', requireAdmin, async (req, res) => 
 });
 
 // POST /api/admin/resend-confirmation — resend confirmation email for a staff+camp
+// POST /api/admin/transfer-staff — move a staff member's requests from one camp to another
+app.post('/api/admin/transfer-staff', requireAdmin, async (req, res) => {
+  try {
+    const { staff_id, from_camp, to_camp } = req.body;
+    if (!staff_id || !from_camp || !to_camp) return res.status(400).json({ error: 'staff_id, from_camp, to_camp required' });
+    await query('UPDATE requests SET camp = $1 WHERE staff_id = $2 AND camp = $3', [to_camp, staff_id, from_camp]);
+    await query('UPDATE staff_confirmations SET camp = $1 WHERE staff_id = $2 AND camp = $3', [to_camp, staff_id, from_camp]);
+    res.json({ ok: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/admin/resend-confirmation', requireAdmin, async (req, res) => {
   try {
     const { staff_id, camp } = req.body;
