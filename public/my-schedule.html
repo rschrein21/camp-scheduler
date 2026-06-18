@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Summer Schedule — Nike Soccer Camp</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #222; }
+  header { background: #111; color: #fff; padding: 18px 24px; }
+  header h1 { font-size: 1.2rem; font-weight: 700; }
+  header p { font-size: 0.85rem; opacity: 0.55; margin-top: 3px; }
+  .container { max-width: 700px; margin: 24px auto; padding: 0 14px 100px; }
+
+  .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+
+  /* Lookup */
+  .lookup-desc { font-size: 0.85rem; color: #555; margin-bottom: 12px; }
+  .lookup-row { display: flex; gap: 8px; }
+  .lookup-row input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; }
+  .lookup-row input:focus { outline: none; border-color: #0066cc; }
+  .lookup-btn { padding: 10px 18px; background: #111; color: #fff; border: none; border-radius: 6px;
+    font-size: 0.9rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .lookup-btn:hover { background: #333; }
+  .lookup-err { font-size: 0.82rem; margin-top: 8px; color: #cc0000; display: none; }
+
+  /* Staff info bar */
+  .staff-bar { display: flex; justify-content: space-between; align-items: center; }
+  .staff-name { font-size: 1rem; font-weight: 700; }
+  .staff-email { font-size: 0.8rem; color: #888; margin-top: 2px; }
+  .change-btn { font-size: 0.78rem; padding: 5px 12px; background: #f5f5f5; border: 1px solid #ddd;
+    border-radius: 5px; cursor: pointer; white-space: nowrap; }
+
+  /* Legend */
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.75rem; color: #666; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
+  .leg-item { display: flex; align-items: center; gap: 5px; }
+  .leg-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
+  /* Week divider */
+  .week-divider { font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: #aaa; padding: 18px 0 6px; }
+
+  /* Camp block */
+  .camp-block { background: #fff; border-radius: 8px; margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; }
+  .camp-title { font-size: 0.85rem; font-weight: 700; padding: 10px 14px;
+    background: #fafafa; border-bottom: 1px solid #eee; }
+
+  /* Days grid */
+  .days-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 10px 12px; }
+  .day-col { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .day-label { font-size: 0.7rem; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  /* Confirmed badge */
+  .conf-badge { width: 100%; text-align: center; font-size: 0.72rem; font-weight: 700;
+    padding: 5px 4px; border-radius: 6px; line-height: 1.2; }
+  .conf-full { background: #dbeafe; color: #1d4ed8; }
+  .conf-am   { background: #fef3c7; color: #92400e; }
+  .conf-pm   { background: #ede9fe; color: #5b21b6; }
+  .conf-sub  { font-size: 0.6rem; font-weight: 400; opacity: 0.7; display: block; }
+
+  /* Shift selector */
+  .shift-sel {
+    width: 100%; padding: 5px 2px; border: 1px solid #ddd; border-radius: 6px;
+    font-size: 0.75rem; background: #fff; cursor: pointer;
+    -webkit-appearance: none; appearance: none; text-align: center; text-align-last: center;
+    color: #999;
+  }
+  .shift-sel:focus { outline: none; border-color: #0066cc; }
+  .shift-sel.sel-am   { border-color: #d69e00; background: #fef9e7; color: #92400e; font-weight: 700; }
+  .shift-sel.sel-pm   { border-color: #9c77cc; background: #f5f0ff; color: #5b21b6; font-weight: 700; }
+  .shift-sel.sel-full { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; font-weight: 700; }
+
+  /* Save bar */
+  .save-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.97);
+    padding: 14px 20px; border-top: 1px solid #e5e5e5; text-align: center; z-index: 100; }
+  .save-btn { display: inline-block; width: 100%; max-width: 400px; background: #111; color: #fff;
+    border: none; padding: 14px; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; }
+  .save-btn:hover { background: #333; }
+  .save-btn:disabled { background: #999; cursor: default; }
+  .save-msg { font-size: 0.82rem; margin-top: 6px; display: none; }
+  .save-ok  { color: #1a7a3a; }
+  .save-err { color: #cc0000; }
+
+  .empty { text-align: center; color: #aaa; font-size: 0.85rem; padding: 24px; }
+
+  @media (max-width: 440px) {
+    .days-grid { gap: 4px; padding: 8px 8px; }
+    .shift-sel { font-size: 0.68rem; padding: 4px 1px; }
+    .conf-badge { font-size: 0.66rem; padding: 4px 2px; }
+    .day-label { font-size: 0.63rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚽ My Summer Schedule</h1>
+  <p>Nike Soccer Camp 2026 — View &amp; update your availability</p>
+</header>
+
+<div class="container">
+
+  <!-- Lookup card -->
+  <div class="card" id="lookupCard">
+    <p class="lookup-desc">Enter your email to view and update your full summer schedule.</p>
+    <div class="lookup-row">
+      <input type="email" id="emailInput" placeholder="your@email.com" onkeydown="if(event.key==='Enter')loadSchedule()">
+      <button class="lookup-btn" onclick="loadSchedule()">Load</button>
+    </div>
+    <div class="lookup-err" id="lookupErr">No record found for that email.
+      <a href="/" style="color:#0066cc;margin-left:4px">Submit availability →</a>
+    </div>
+  </div>
+
+  <!-- Schedule section (hidden until loaded) -->
+  <div id="scheduleSection" style="display:none">
+
+    <div class="card">
+      <div class="staff-bar">
+        <div>
+          <div class="staff-name" id="staffName"></div>
+          <div class="staff-email" id="staffEmail"></div>
+        </div>
+        <button class="change-btn" onclick="resetLookup()">Change</button>
+      </div>
+      <div class="legend">
+        <div class="leg-item"><div class="leg-dot" style="background:#dbeafe"></div> Full Day confirmed</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#fef3c7"></div> AM confirmed</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#ede9fe"></div> PM confirmed</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#f5f5f5;border:1px solid #ddd"></div> Available to set</div>
+      </div>
+    </div>
+
+    <div id="campsContainer"></div>
+
+    <div class="save-bar">
+      <button class="save-btn" id="saveBtn" onclick="saveSchedule()">Save Changes</button>
+      <div class="save-msg save-ok" id="saveOk">✅ Schedule updated!</div>
+      <div class="save-msg save-err" id="saveErr">Something went wrong. Please try again.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const CAMP_ORDER = [
+  'June 15\u201319 \u00b7 Seattle University',
+  'June 22\u201326 \u00b7 Seattle University',
+  'June 22\u201326 \u00b7 West Seattle Del Ridge',
+  'July 6\u201310 \u00b7 Seattle University',
+  'July 6\u201310 \u00b7 Lower Woodland',
+  'July 6\u201310 \u00b7 Kirkland',
+  'July 13\u201317 \u00b7 Seattle University',
+  'July 13\u201317 \u00b7 West Seattle Hiawatha',
+  'July 13\u201317 \u00b7 Issaquah',
+  'July 20\u201324 \u00b7 Seattle University',
+  'July 20\u201324 \u00b7 West Seattle Del Ridge',
+  'July 20\u201324 \u00b7 Bothell',
+  'Aug 3\u20137 \u00b7 Washington Park',
+  'Aug 3\u20137 \u00b7 Bellevue',
+  'Aug 10\u201314 \u00b7 Lower Woodland',
+  'Aug 10\u201314 \u00b7 Issaquah',
+  'Aug 17\u201321 \u00b7 West Seattle Del Ridge',
+  'Aug 17\u201321 \u00b7 Bellevue',
+];
+const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+
+let currentStaff = null;
+// campState: { [campName]: { [day]: { shift, status } } }
+let campState = {};
+
+// Auto-load from URL ?email= param
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const email = params.get('email');
+  if (email) {
+    document.getElementById('emailInput').value = email;
+    loadSchedule();
+  }
+});
+
+async function loadSchedule() {
+  const email = document.getElementById('emailInput').value.trim();
+  if (!email) return;
+  const errEl = document.getElementById('lookupErr');
+  errEl.style.display = 'none';
+
+  const res = await fetch('/api/staff/lookup?email=' + encodeURIComponent(email));
+  if (!res.ok) {
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const { staff, requests } = await res.json();
+  currentStaff = staff;
+
+  // Build campState
+  campState = {};
+  CAMP_ORDER.forEach(c => { campState[c] = {}; });
+  requests.forEach(r => {
+    if (!campState[r.camp]) campState[r.camp] = {};
+    campState[r.camp][r.day] = {
+      shift: r.confirmed_shift || r.shift,
+      status: r.status
+    };
+  });
+
+  document.getElementById('staffName').textContent = staff.name;
+  document.getElementById('staffEmail').textContent = staff.email;
+  document.getElementById('lookupCard').style.display = 'none';
+  document.getElementById('scheduleSection').style.display = '';
+  renderCamps();
+}
+
+function weekOf(camp) {
+  return camp.split('\u00b7')[0].trim();
+}
+
+function slug(str) {
+  return str.replace(/[^a-z0-9]/gi, '_');
+}
+
+function renderCamps() {
+  let html = '';
+  let lastWeek = null;
+
+  CAMP_ORDER.forEach(camp => {
+    const week = weekOf(camp);
+    if (week !== lastWeek) {
+      html += `<div class="week-divider">${week}</div>`;
+      lastWeek = week;
+    }
+
+    html += `<div class="camp-block">
+      <div class="camp-title">${camp}</div>
+      <div class="days-grid">`;
+
+    DAYS.forEach(d => {
+      const s = (campState[camp] || {})[d];
+      const isConfirmed = s && s.status === 'confirmed';
+
+      html += `<div class="day-col"><div class="day-label">${d}</div>`;
+
+      if (isConfirmed) {
+        const shift = s.shift;
+        const cls = shift === 'full' ? 'conf-full' : shift === 'am' ? 'conf-am' : 'conf-pm';
+        const label = shift === 'full' ? 'Full' : shift.toUpperCase();
+        html += `<div class="conf-badge ${cls}">${label}<span class="conf-sub">✓ set</span></div>`;
+      } else {
+        const val = s ? s.shift : '';
+        const selId = `s_${slug(camp)}_${d}`;
+        const selCls = val === 'am' ? ' sel-am' : val === 'pm' ? ' sel-pm' : val === 'full' ? ' sel-full' : '';
+        html += `<select id="${selId}" class="shift-sel${selCls}" onchange="onShiftChange(this)">
+          <option value="">—</option>
+          <option value="am"  ${val==='am'  ?'selected':''}>AM</option>
+          <option value="pm"  ${val==='pm'  ?'selected':''}>PM</option>
+          <option value="full"${val==='full'?'selected':''}>Full</option>
+        </select>`;
+      }
+
+      html += `</div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  document.getElementById('campsContainer').innerHTML = html;
+}
+
+function onShiftChange(el) {
+  el.className = 'shift-sel';
+  if (el.value === 'am')   el.classList.add('sel-am');
+  if (el.value === 'pm')   el.classList.add('sel-pm');
+  if (el.value === 'full') el.classList.add('sel-full');
+}
+
+function resetLookup() {
+  currentStaff = null;
+  campState = {};
+  document.getElementById('lookupCard').style.display = '';
+  document.getElementById('scheduleSection').style.display = 'none';
+  document.getElementById('emailInput').value = '';
+  history.replaceState(null, '', location.pathname);
+}
+
+async function saveSchedule() {
+  const saveOk  = document.getElementById('saveOk');
+  const saveErr = document.getElementById('saveErr');
+  const saveBtn = document.getElementById('saveBtn');
+  saveOk.style.display = 'none';
+  saveErr.style.display = 'none';
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+
+  // Collect all non-confirmed selections
+  const shifts = [];
+  CAMP_ORDER.forEach(camp => {
+    DAYS.forEach(d => {
+      const s = (campState[camp] || {})[d];
+      if (s && s.status === 'confirmed') return; // leave confirmed alone
+      const el = document.getElementById(`s_${slug(camp)}_${d}`);
+      if (el && el.value) {
+        shifts.push({ camp, day: d, shift: el.value });
+      }
+    });
+  });
+
+  try {
+    const res = await fetch('/api/staff/update-summer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: currentStaff.email, shifts })
+    });
+
+    if (res.ok) {
+      saveOk.style.display = 'block';
+      // Reload state from server after short delay
+      setTimeout(async () => {
+        await loadSchedule();
+        saveOk.style.display = 'none';
+      }, 1500);
+    } else {
+      saveErr.style.display = 'block';
+    }
+  } catch (e) {
+    saveErr.style.display = 'block';
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Changes';
+  }
+}
+</script>
+</body>
+</html>

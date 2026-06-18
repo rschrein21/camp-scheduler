@@ -470,9 +470,31 @@ app.get('/api/staff/lookup', async (req, res) => {
     const rows = await query('SELECT * FROM staff WHERE LOWER(email) = LOWER($1)', [email.trim()]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     const staff = rows[0];
-    const requests = await query('SELECT camp, day, shift FROM requests WHERE staff_id = $1', [staff.id]);
+    const requests = await query("SELECT camp, day, shift, status, confirmed_shift FROM requests WHERE staff_id = $1 AND (status IS NULL OR status != 'cancelled')", [staff.id]);
     res.json({ staff, requests });
   } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/staff/update-summer — update full summer availability (preserves confirmed shifts)
+app.post('/api/staff/update-summer', async (req, res) => {
+  try {
+    const { email, shifts } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+    const rows = await query('SELECT id, name FROM staff WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+    if (!rows.length) return res.status(404).json({ error: 'Staff not found' });
+    const { id: staffId, name: staffName } = rows[0];
+    // Delete only non-confirmed requests so confirmed shifts are preserved
+    await query("DELETE FROM requests WHERE staff_id = $1 AND status NOT IN ('confirmed')", [staffId]);
+    // Insert new pending shifts
+    for (const s of (shifts || [])) {
+      await query('INSERT INTO requests (staff_id, camp, day, shift) VALUES ($1,$2,$3,$4)', [staffId, s.camp, s.day, s.shift]);
+    }
+    await query("INSERT INTO staff_notifications (staff_id, staff_name, action) VALUES ($1,$2,'updated')", [staffId, staffName]);
+    res.json({ ok: true, message: 'Schedule updated!' });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
