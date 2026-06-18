@@ -278,7 +278,7 @@ async function loadExisting() {
   document.getElementById('lookupOk').style.display = 'none';
   document.getElementById('lookupErr').style.display = 'none';
 
-  const res = await fetch('/api/staff?email=' + encodeURIComponent(email));
+  const res = await fetch('/api/staff/lookup?email=' + encodeURIComponent(email));
   if (!res.ok) {
     document.getElementById('lookupErr').style.display = 'block';
     return;
