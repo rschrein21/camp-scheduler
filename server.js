@@ -968,6 +968,7 @@ app.patch('/api/admin/staff/:id', requireAdmin, async (req, res) => {
 app.delete('/api/admin/staff/:id', requireAdmin, async (req, res) => {
   try {
     const id = req.params.id;
+    await query('DELETE FROM staff_notifications WHERE staff_id = $1', [id]);
     await query('DELETE FROM staff_confirmations WHERE staff_id = $1', [id]);
     await query('DELETE FROM hours_worked WHERE staff_id = $1', [id]);
     await query('DELETE FROM requests WHERE staff_id = $1', [id]);
@@ -1546,6 +1547,80 @@ app.post('/api/admin/fill-open-shift', requireAdmin, async (req, res) => {
     }
 
     res.json({ ok: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET /api/staff/available-days?token=xxx — days in the camp the staff member has no active shift for
+app.get('/api/staff/available-days', async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) return res.status(400).json({ error: 'Token required' });
+    const tokenRows = await query(
+      'SELECT sc.staff_id, sc.camp FROM staff_confirmations sc WHERE sc.token = $1',
+      [token]
+    );
+    if (!tokenRows.length) return res.status(404).json({ error: 'Invalid or expired link' });
+    const { staff_id, camp } = tokenRows[0];
+    // Find days already covered by an active (non-cancelled) request
+    const activeRows = await query(
+      `SELECT DISTINCT day FROM requests WHERE staff_id = $1 AND camp = $2 AND status NOT IN ('cancelled','filled')`,
+      [staff_id, camp]
+    );
+    const activeDays = new Set(activeRows.map(r => r.day));
+    const ALL_DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+    const availableDays = ALL_DAYS.filter(d => !activeDays.has(d));
+    res.json({ camp, availableDays });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/staff/add-availability — staff requests additional shifts { token, shifts: [{day, shift}] }
+app.post('/api/staff/add-availability', async (req, res) => {
+  try {
+    const { token, shifts } = req.body;
+    if (!token || !Array.isArray(shifts) || !shifts.length) return res.status(400).json({ error: 'Token and shifts required' });
+    const tokenRows = await query(
+      'SELECT sc.staff_id, sc.camp, s.name FROM staff_confirmations sc JOIN staff s ON sc.staff_id = s.id WHERE sc.token = $1',
+      [token]
+    );
+    if (!tokenRows.length) return res.status(404).json({ error: 'Invalid or expired link' });
+    const { staff_id, camp, name } = tokenRows[0];
+
+    // Validate days and insert
+    const ALL_DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+    const VALID_SHIFTS = ['am','pm','full'];
+    const inserted = [];
+    for (const { day, shift } of shifts) {
+      if (!ALL_DAYS.includes(day) || !VALID_SHIFTS.includes(shift)) continue;
+      // Only insert if no active request exists for this day
+      const existing = await query(
+        `SELECT id FROM requests WHERE staff_id = $1 AND camp = $2 AND day = $3 AND status NOT IN ('cancelled','filled')`,
+        [staff_id, camp, day]
+      );
+      if (existing.length) continue;
+      if (IS_PG) {
+        await query('INSERT INTO requests (staff_id, camp, day, shift, status) VALUES ($1,$2,$3,$4,$5)', [staff_id, camp, day, shift, 'pending']);
+      } else {
+        await query('INSERT INTO requests (staff_id, camp, day, shift, status) VALUES (?,?,?,?,?)', [staff_id, camp, day, shift, 'pending']);
+      }
+      inserted.push({ day, shift });
+    }
+
+    if (!inserted.length) return res.status(400).json({ error: 'No new shifts added (already assigned or invalid)' });
+
+    // Notify Rich
+    const shiftList = inserted.map(s => `${s.day} (${s.shift.toUpperCase()})`).join(', ');
+    const notifyHtml = `
+      <p><strong>${name}</strong> has added availability for <strong>${camp}</strong>:</p>
+      <ul>${inserted.map(s => `<li>${s.day} — ${s.shift.toUpperCase()}</li>`).join('')}</ul>
+      <p><a href="${BASE_URL}/admin">Open Admin Panel → Requests tab</a></p>
+    `;
+    if (resendClient) {
+      resendClient.emails.send({ from: RESEND_FROM, to: GMAIL_USER, subject: `📅 New Availability: ${name} — ${camp}`, html: notifyHtml }).catch(e => console.error('Notify email error:', e));
+    } else if (emailTransport) {
+      emailTransport.sendMail({ from: `"Nike Soccer Camps" <${GMAIL_USER}>`, to: GMAIL_USER, subject: `📅 New Availability: ${name} — ${camp}`, html: notifyHtml }).catch(e => console.error('Notify email error:', e));
+    }
+
+    res.json({ ok: true, added: inserted });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
