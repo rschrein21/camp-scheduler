@@ -50,18 +50,19 @@ const emailTransport = GMAIL_APP_PASSWORD ? nodemailer.createTransport({
   auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD }
 }) : null;
 
-async function sendConfirmationEmail(staffName, staffEmail, camp, token, shift) {
-  const link = `${BASE_URL}/staff-confirm?token=${token}`;
+async function sendConfirmationEmail(staffName, staffEmail, camp, staffPhone, shift) {
+  const digits = (staffPhone || '').replace(/\D/g, '').slice(-10);
+  const link = digits ? `${BASE_URL}/my-schedule?phone=${digits}` : `${BASE_URL}/my-schedule`;
   const html = `
     <p>Hi ${staffName},</p>
-    <p>Your schedule for <strong>${camp}</strong> has been set. Please click the button below to confirm you'll be there.</p>
+    <p>You've been confirmed for <strong>${camp}</strong>!</p>
+    <p>You can view your full summer schedule and make any changes using the link below:</p>
     <p style="margin:24px 0">
-      <a href="${link}" style="background:#111;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:700;font-size:1rem">View &amp; Confirm My Schedule</a>
+      <a href="${link}" style="background:#111;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:700;font-size:1rem">View My Summer Schedule</a>
     </p>
     <p style="color:#888;font-size:0.85rem">Or copy this link: ${link}</p>
-    <p style="color:#555;font-size:0.9rem"><em>Note: This confirmation is for <strong>${camp}</strong> only. You may be assigned to additional camps — you'll receive a separate email for each one.</em></p>
     <p>Questions? Reply to this email or contact Rich directly.</p>
-    <p>Thanks,<br>Rich Schreiner<br>Nike Soccer Camps</p>
+    <p>Thanks,<br>Coach Rich<br>Nike Soccer Camps</p>
   `;
   if (resendClient) {
     const { error } = await resendClient.emails.send({
@@ -113,14 +114,14 @@ if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_FROM_NUMBER) {
   }
 }
 
-async function sendConfirmationSMS(staffPhone, camp, token) {
+async function sendConfirmationSMS(staffPhone, camp) {
   if (!twilioClient || !staffPhone) return false;
-  const link = `${BASE_URL}/staff-confirm?token=${token}`;
-  // Normalize to E.164
   const digits = staffPhone.replace(/\D/g, '');
+  const last10 = digits.slice(-10);
   const e164 = digits.length === 10 ? `+1${digits}` : `+${digits}`;
+  const link = `${BASE_URL}/my-schedule?phone=${last10}`;
   await twilioClient.messages.create({
-    body: `Nike Soccer Camps: You're confirmed for ${camp}. View & confirm your schedule: ${link}`,
+    body: `Nike Soccer Camps: You're confirmed for ${camp}. View or update your full summer schedule: ${link}`,
     from: TWILIO_FROM_NUMBER,
     to: e164
   });
@@ -128,12 +129,12 @@ async function sendConfirmationSMS(staffPhone, camp, token) {
 }
 
 // SMS-first: try SMS, always send email as backup
-async function sendConfirmationNotification(staffName, staffEmail, staffPhone, camp, token, shift) {
+async function sendConfirmationNotification(staffName, staffEmail, staffPhone, camp, shift) {
   const result = { smsSent: false, emailSent: false };
   // 1. SMS (primary)
   if (staffPhone && twilioClient) {
     try {
-      result.smsSent = await sendConfirmationSMS(staffPhone, camp, token);
+      result.smsSent = await sendConfirmationSMS(staffPhone, camp);
     } catch (e) {
       console.error('SMS error:', e.message);
     }
@@ -141,7 +142,7 @@ async function sendConfirmationNotification(staffName, staffEmail, staffPhone, c
   // 2. Email (always send as backup / for record-keeping)
   if (staffEmail) {
     try {
-      result.emailSent = await sendConfirmationEmail(staffName, staffEmail, camp, token, shift);
+      result.emailSent = await sendConfirmationEmail(staffName, staffEmail, camp, staffPhone, shift);
     } catch (e) {
       console.error('Email error:', e.message);
     }
@@ -754,7 +755,7 @@ async function maybeAutoConfirm(staff_id, camp) {
         [staff_id, camp, token]
       );
     }
-    sendConfirmationNotification(name, email, phone, camp, token, shift).then(async ({ smsSent, emailSent }) => {
+    sendConfirmationNotification(name, email, phone, camp, shift).then(async ({ smsSent, emailSent }) => {
       if (IS_PG) {
         await query(
           'UPDATE staff_confirmations SET email_sent_at = CASE WHEN $1 THEN NOW() ELSE email_sent_at END, sms_sent_at = CASE WHEN $2 THEN NOW() ELSE sms_sent_at END WHERE staff_id = $3 AND camp = $4',
@@ -1248,7 +1249,7 @@ app.post('/api/admin/send-all-confirmations', requireAdmin, async (req, res) => 
           `, [row.staff_id, row.camp, token]);
         }
         const shift = row.confirmed_shift || row.shift;
-        const result = await sendConfirmationNotification(row.name, row.email, row.phone, row.camp, token, shift);
+        const result = await sendConfirmationNotification(row.name, row.email, row.phone, row.camp, shift);
         if (IS_PG) {
           await query(
             'UPDATE staff_confirmations SET email_sent_at = CASE WHEN $1 THEN NOW() ELSE email_sent_at END, sms_sent_at = CASE WHEN $2 THEN NOW() ELSE sms_sent_at END WHERE staff_id = $3 AND camp = $4',
@@ -1296,7 +1297,7 @@ app.post('/api/admin/resend-confirmation', requireAdmin, async (req, res) => {
         ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, confirmed = FALSE, confirmed_at = NULL, email_sent_at = NULL, sms_sent_at = NULL
       `, [staff_id, camp, token]);
     }
-    sendConfirmationNotification(name, email, phone, camp, token, shift).then(async ({ smsSent, emailSent }) => {
+    sendConfirmationNotification(name, email, phone, camp, shift).then(async ({ smsSent, emailSent }) => {
       if (IS_PG) {
         await query(
           'UPDATE staff_confirmations SET email_sent_at = CASE WHEN $1 THEN NOW() ELSE email_sent_at END, sms_sent_at = CASE WHEN $2 THEN NOW() ELSE sms_sent_at END WHERE staff_id = $3 AND camp = $4',
@@ -1584,7 +1585,7 @@ app.post('/api/admin/fill-open-shift', requireAdmin, async (req, res) => {
         VALUES ($1,$2,$3)
         ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, confirmed = FALSE, confirmed_at = NULL, email_sent_at = NULL, sms_sent_at = NULL
       `, [sub_staff_id, camp, token]);
-      sendConfirmationNotification(name, email, phone, camp, token, shift).then(async ({ smsSent, emailSent }) => {
+      sendConfirmationNotification(name, email, phone, camp, shift).then(async ({ smsSent, emailSent }) => {
         await query(
           'UPDATE staff_confirmations SET email_sent_at = CASE WHEN $1 THEN NOW() ELSE email_sent_at END, sms_sent_at = CASE WHEN $2 THEN NOW() ELSE sms_sent_at END WHERE staff_id = $3 AND camp = $4',
           [emailSent, smsSent, sub_staff_id, camp]
