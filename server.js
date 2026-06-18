@@ -256,6 +256,8 @@ if (IS_PG) {
     await pool.query(`ALTER TABLE director_availability ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'skills'`);
     await pool.query(`ALTER TABLE staff ADD COLUMN IF NOT EXISTS bg_check_done BOOLEAN NOT NULL DEFAULT FALSE`);
     await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS sub_list BOOLEAN NOT NULL DEFAULT FALSE`);
+    await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS cancel_requested BOOLEAN NOT NULL DEFAULT FALSE`);
+    await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS cancel_reason TEXT`);
     // Allow multiple directors per camp per role — drop camp+role unique, enforce director+camp unique
     await pool.query(`ALTER TABLE director_assignments DROP CONSTRAINT IF EXISTS director_assignments_camp_role_key`);
     await pool.query(`
@@ -492,7 +494,7 @@ app.get('/api/staff/lookup', async (req, res) => {
       return res.json({ director, assignments, availability, type: 'director' });
     }
     const staff = rows[0];
-    const requests = await query("SELECT camp, day, shift, status, confirmed_shift FROM requests WHERE staff_id = $1 AND (status IS NULL OR status != 'cancelled')", [staff.id]);
+    const requests = await query("SELECT id AS req_id, camp, day, shift, status, confirmed_shift, cancel_requested, cancel_reason FROM requests WHERE staff_id = $1 AND (status IS NULL OR status != 'cancelled')", [staff.id]);
     res.json({ staff, requests, type: 'staff' });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
@@ -513,6 +515,74 @@ app.post('/api/director/update-availability', async (req, res) => {
       await query('INSERT INTO director_availability (director_id, camp, role) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', [dirId, c.camp, c.role || 'skills']);
     }
     res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/staff/request-cancel — staff requests to cancel a confirmed shift day
+app.post('/api/staff/request-cancel', async (req, res) => {
+  try {
+    const { req_id, reason } = req.body;
+    if (!req_id) return res.status(400).json({ error: 'req_id required' });
+    const rows = await query("SELECT r.id, r.camp, r.day, r.shift, r.confirmed_shift, s.name, s.phone FROM requests r JOIN staff s ON r.staff_id = s.id WHERE r.id = $1 AND r.status = 'confirmed'", [req_id]);
+    if (!rows.length) return res.status(404).json({ error: 'Confirmed shift not found' });
+    const { camp, day, name, phone } = rows[0];
+    await query('UPDATE requests SET cancel_requested = TRUE, cancel_reason = $1 WHERE id = $2', [reason || null, req_id]);
+    // Notify Rich by SMS
+    const richPhone = process.env.RICH_PHONE || '+12066059954';
+    if (twilioClient) {
+      await twilioClient.messages.create({
+        body: `Camp scheduler: ${name} requested to cancel ${day} at ${camp}${reason ? '. Reason: ' + reason : ''}. Approve or reject in admin.`,
+        from: TWILIO_FROM_NUMBER,
+        to: richPhone
+      }).catch(e => console.warn('SMS notify failed:', e.message));
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/admin/resolve-cancel — approve or reject a cancellation request
+app.post('/api/admin/resolve-cancel', requireAdmin, async (req, res) => {
+  try {
+    const { req_id, action } = req.body; // action: 'approve' | 'reject'
+    if (!req_id || !action) return res.status(400).json({ error: 'req_id and action required' });
+    const rows = await query('SELECT r.*, s.name, s.phone, s.email FROM requests r JOIN staff s ON r.staff_id = s.id WHERE r.id = $1', [req_id]);
+    if (!rows.length) return res.status(404).json({ error: 'Request not found' });
+    const row = rows[0];
+    if (action === 'approve') {
+      if (IS_PG) {
+        await query("UPDATE requests SET status = 'cancelled', cancelled_at = NOW(), cancel_requested = FALSE WHERE id = $1", [req_id]);
+      } else {
+        await query("UPDATE requests SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP, cancel_requested = FALSE WHERE id = $1", [req_id]);
+      }
+      // Notify staff
+      if (twilioClient && row.phone) {
+        const digits = row.phone.replace(/\D/g, '');
+        const e164 = digits.length === 10 ? `+1${digits}` : `+${digits}`;
+        await twilioClient.messages.create({
+          body: `Nike Soccer Camps: Your cancellation for ${row.day} at ${row.camp} has been approved by Coach Rich.`,
+          from: TWILIO_FROM_NUMBER, to: e164
+        }).catch(e => console.warn('SMS failed:', e.message));
+      }
+    } else {
+      // Reject — clear the request flag
+      await query('UPDATE requests SET cancel_requested = FALSE, cancel_reason = NULL WHERE id = $1', [req_id]);
+      // Notify staff
+      if (twilioClient && row.phone) {
+        const digits = row.phone.replace(/\D/g, '');
+        const e164 = digits.length === 10 ? `+1${digits}` : `+${digits}`;
+        await twilioClient.messages.create({
+          body: `Nike Soccer Camps: Your cancellation request for ${row.day} at ${row.camp} was not approved. Please reach out to Coach Rich directly.`,
+          from: TWILIO_FROM_NUMBER, to: e164
+        }).catch(e => console.warn('SMS failed:', e.message));
+      }
+    }
+    res.json({ ok: true, action });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -748,7 +818,7 @@ app.get('/api/admin/camps', requireAdmin, async (req, res) => {
   try {
     const rows = await query(`
       SELECT r.camp, r.day, r.shift, r.confirmed_shift, r.status, r.id as req_id,
-             r.sub_list,
+             r.sub_list, r.cancel_requested, r.cancel_reason,
              s.name, s.email, s.phone, s.preferred_role, s.id as staff_id,
              s.bg_check_done,
              COALESCE(sr.rating, 3) as rating

@@ -310,8 +310,10 @@ function renderCamps() {
     };
     campMap[row.camp][key].days[row.day] = {
       shift: row.shift, confirmed_shift: row.confirmed_shift,
-      req_id: row.req_id, status: row.status
+      req_id: row.req_id, status: row.status,
+      cancel_requested: row.cancel_requested, cancel_reason: row.cancel_reason
     };
+    if (row.cancel_requested) campMap[row.camp][key].hasCancelRequest = true;
     if (row.confirmed_shift) campMap[row.camp][key].confirmedShift = row.confirmed_shift;
     // overallStatus: confirmed > pending > declined
     const cur = campMap[row.camp][key].overallStatus;
@@ -422,9 +424,10 @@ function renderCamps() {
         const dclass = dropdownClass(dval);
         const safecamp = campName.replace(/'/g, "\\'");
         const detailId = `detail-${s.staff_id}-${campName.replace(/[^a-z0-9]/gi,'_')}`;
+        const cancelAlert = s.hasCancelRequest ? `<span style="font-size:0.7rem;background:#fff3cd;color:#856404;padding:1px 6px;border-radius:8px;margin-left:4px">⚠️ Cancel req</span>` : '';
         html += `<tr>
           <td class="name-col">
-            <strong>${s.name}</strong><br>
+            <strong>${s.name}</strong>${cancelAlert}<br>
             <span style="font-size:0.73rem;color:#aaa">${s.email}</span>
           </td>
           <td><span class="role-badge">${s.preferred_role || '?'}</span></td>
@@ -434,6 +437,14 @@ function renderCamps() {
             if (!day) return `<td>${dayBadge(null, false, d)}</td>`;
             const effShift = day.confirmed_shift || day.shift;
             const cancelled = day.status === 'cancelled';
+            if (day.cancel_requested) {
+              const reasonTip = day.cancel_reason ? ` title="Reason: ${day.cancel_reason}"` : '';
+              return `<td style="text-align:center">
+                <div style="font-size:0.7rem;background:#fff3cd;color:#856404;padding:2px 5px;border-radius:4px;margin-bottom:3px"${reasonTip}>⚠️ ${effShift.toUpperCase()}</div>
+                <button onclick="resolveCancel(${day.req_id},'approve')" style="font-size:0.65rem;padding:2px 5px;background:#d4edda;border:1px solid #c3e6cb;border-radius:3px;cursor:pointer;margin:1px">Approve</button>
+                <button onclick="resolveCancel(${day.req_id},'reject')" style="font-size:0.65rem;padding:2px 5px;background:#f8d7da;border:1px solid #f5c6cb;border-radius:3px;cursor:pointer;margin:1px">Reject</button>
+              </td>`;
+            }
             return `<td>${dayBadge(effShift, cancelled, d)}</td>`;
           }).join('')}
           <td>
@@ -669,6 +680,16 @@ async function sendAllConfirmations() {
 
 async function setBgCheck(staffId, done) {
   await fetch('/api/admin/bg-check', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ staff_id: staffId, done }) });
+}
+
+async function resolveCancel(reqId, action) {
+  const label = action === 'approve' ? 'Approve this cancellation?' : 'Reject this cancellation request?';
+  if (!confirm(label)) return;
+  const res = await fetch('/api/admin/resolve-cancel', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ req_id: reqId, action })
+  });
+  if (res.ok) { load(); } else { alert('Error resolving cancellation.'); }
 }
 
 async function resendConfirmation(staffId, camp) {
