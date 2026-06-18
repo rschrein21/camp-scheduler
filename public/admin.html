@@ -117,7 +117,7 @@
   </header>
   <div class="tabs">
     <div class="tab active" onclick="switchTab('camps')">By Camp</div>
-    <div class="tab" onclick="switchTab('daily')">Daily Summary</div>
+    <div class="tab" onclick="switchTab('daily')" style="display:none">Daily Summary</div>
     <div class="tab" onclick="switchTab('staff')">By Staff</div>
     <div class="tab" onclick="switchTab('openShifts')">Open Shifts</div>
     <div class="tab" onclick="switchTab('directors')">Directors</div>
@@ -357,10 +357,37 @@ function renderCamps() {
     const amOk = confirmedAM >= need.am;
     const pmOk = confirmedPM >= need.pm;
 
+    // Per-day confirmed headcount for this camp
+    const dayCount = {};
+    DAYS.forEach(d => {
+      dayCount[d] = { am: 0, pm: 0, full: 0 };
+      staffArr.forEach(s => {
+        if (s.overallStatus !== 'confirmed') return;
+        const dayData = s.days[d];
+        if (!dayData || dayData.status === 'declined') return;
+        const eff = dayData.confirmed_shift || dayData.shift;
+        if (eff === 'am') dayCount[d].am++;
+        else if (eff === 'pm') dayCount[d].pm++;
+        else if (eff === 'full') dayCount[d].full++;
+      });
+    });
+    const daySummaryHtml = DAYS.map(d => {
+      const c = dayCount[d];
+      const parts = [];
+      if (c.full) parts.push(`<span style="color:#2a6">F:${c.full}</span>`);
+      if (c.am)   parts.push(`<span style="color:#0066cc">AM:${c.am}</span>`);
+      if (c.pm)   parts.push(`<span style="color:#8844cc">PM:${c.pm}</span>`);
+      const total = c.full + c.am + c.pm;
+      return `<div style="text-align:center;min-width:48px">
+        <div style="font-size:0.68rem;font-weight:700;color:#888;margin-bottom:2px">${d}</div>
+        <div style="font-size:0.75rem;font-weight:600">${total > 0 ? parts.join(' ') : '<span style="color:#ccc">—</span>'}</div>
+      </div>`;
+    }).join('');
+
     html += `<div class="camp-section">
       <div class="camp-hdr">
         <h3>${campName}</h3>
-
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${daySummaryHtml}</div>
       </div>`;
 
     if (staffArr.length === 0) {
