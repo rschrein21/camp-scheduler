@@ -475,7 +475,10 @@ function renderCamps() {
               const ua = s.schedule_updated_at   ? new Date(s.schedule_updated_at)   : null;
               if (s.overallStatus !== 'confirmed') return '<span style="color:#ccc">—</span>';
               if (ca && (!ua || ca > ua)) return '<span style="color:#1a7a3a;font-weight:700">✅ Confirmed</span>';
-              if (ua) return `<button onclick="toggleDetails('${detailId}')" style="background:none;border:none;cursor:pointer;text-align:center;padding:0"><span style="color:#e07000;font-weight:700">✏️ Updated</span><br><span style="color:#0066cc;font-size:0.68rem;text-decoration:underline">review changes</span></button>`;
+              if (ua) return `<div style="text-align:center">
+                <button onclick="toggleDetails('${detailId}')" style="background:none;border:none;cursor:pointer;padding:0"><span style="color:#e07000;font-weight:700">✏️ Updated</span><br><span style="color:#0066cc;font-size:0.68rem;text-decoration:underline">review changes</span></button><br>
+                <button onclick="markReviewed(${s.staff_id})" style="margin-top:4px;font-size:0.65rem;padding:2px 8px;background:#f0fff5;border:1px solid #a3e6c0;border-radius:4px;color:#1a7a3a;cursor:pointer;font-weight:600">✔ Mark Reviewed</button>
+              </div>`;
               return '<span style="color:#aaa">⧓ Awaiting</span>';
             })()}
           </td>
@@ -767,6 +770,14 @@ async function sendSubOffer(staffId, camp, day, shift) {
 
 function closeSubPicker() {
   document.getElementById('subPickerModal').style.display = 'none';
+}
+
+async function markReviewed(staffId) {
+  const res = await fetch('/api/admin/mark-reviewed', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ staff_id: staffId })
+  });
+  if (res.ok) { load(); } else { alert('Error marking as reviewed.'); }
 }
 
 async function resendConfirmation(staffId, camp) {

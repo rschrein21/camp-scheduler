@@ -589,6 +589,19 @@ app.post('/api/admin/offer-sub', requireAdmin, async (req, res) => {
   }
 });
 
+// POST /api/admin/mark-reviewed — clear schedule_updated_at so staff shows Awaiting/Confirmed
+app.post('/api/admin/mark-reviewed', requireAdmin, async (req, res) => {
+  try {
+    const { staff_id } = req.body;
+    if (!staff_id) return res.status(400).json({ error: 'staff_id required' });
+    await query('UPDATE staff SET schedule_updated_at = NULL WHERE id = $1', [staff_id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /api/staff/confirm-schedule — staff taps "Looks good" on my-schedule
 app.post('/api/staff/confirm-schedule', async (req, res) => {
   try {
