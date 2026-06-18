@@ -371,23 +371,27 @@ function renderCamps() {
         else if (eff === 'full') dayCount[d].full++;
       });
     });
-    const daySummaryHtml = DAYS.map(d => {
-      const c = dayCount[d];
-      const parts = [];
-      if (c.full) parts.push(`<span style="color:#2a6">F:${c.full}</span>`);
-      if (c.am)   parts.push(`<span style="color:#0066cc">AM:${c.am}</span>`);
-      if (c.pm)   parts.push(`<span style="color:#8844cc">PM:${c.pm}</span>`);
-      const total = c.full + c.am + c.pm;
-      return `<div style="text-align:center;min-width:48px">
-        <div style="font-size:0.68rem;font-weight:700;color:#888;margin-bottom:2px">${d}</div>
-        <div style="font-size:0.75rem;font-weight:600">${total > 0 ? parts.join(' ') : '<span style="color:#ccc">—</span>'}</div>
-      </div>`;
-    }).join('');
+    // Build summary row (injected into table thead after column headers)
+    const makeSummaryRow = () => {
+      const cells = DAYS.map(d => {
+        const c = dayCount[d];
+        const parts = [];
+        if (c.full) parts.push('<span style="color:#1a7a3a;font-weight:700">F:'+c.full+'</span>');
+        if (c.am)   parts.push('<span style="color:#0066cc;font-weight:700">AM:'+c.am+'</span>');
+        if (c.pm)   parts.push('<span style="color:#8844cc;font-weight:700">PM:'+c.pm+'</span>');
+        return '<td style="text-align:center;background:#f0f6ff;padding:4px 2px">'+(parts.length ? parts.join('<br>') : '<span style="color:#ccc">—</span>')+'</td>';
+      }).join('');
+      return `<tr style="font-size:0.72rem">
+          <td class="name-col" style="background:#f0f6ff;font-weight:700;color:#555;font-size:0.71rem">✅ Confirmed</td>
+          <td style="background:#f0f6ff"></td><td style="background:#f0f6ff"></td>
+          ${cells}
+          <td style="background:#f0f6ff"></td><td style="background:#f0f6ff"></td><td style="background:#f0f6ff"></td>
+        </tr>`;
+    };
 
     html += `<div class="camp-section">
       <div class="camp-hdr">
         <h3>${campName}</h3>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${daySummaryHtml}</div>
       </div>`;
 
     if (staffArr.length === 0) {
@@ -402,7 +406,7 @@ function renderCamps() {
           <th>Status</th>
           <th>BG Check</th>
           <th>Staff Confirmed</th>
-        </tr></thead><tbody>`;
+        </tr>${makeSummaryRow()}</thead><tbody>`;
       staffArr.forEach(s => {
         const dval = dropdownVal(s.overallStatus, s);
         const dclass = dropdownClass(dval);
