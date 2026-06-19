@@ -381,18 +381,25 @@ function renderSchedule() {
     const week = campName.split('\u00b7')[0].trim();
     if (week !== lastWeek) { html += `<div class="week-divider">${week}</div>`; lastWeek = week; }
 
-    // Count confirmed AM/PM
-    const amCount = staffArr.filter(s => { const e=effectiveShift(s); return e==='am'||e==='full'; }).length;
-    const pmCount = staffArr.filter(s => { const e=effectiveShift(s); return e==='pm'||e==='full'; }).length;
-    const amOk = amCount >= need.am, pmOk = pmCount >= need.pm;
+    // Per-day confirmed headcount for this camp
+    const dayCount = {};
+    DAYS.forEach(d => { dayCount[d] = { am: 0, pm: 0, full: 0 }; });
+    staffArr.forEach(s => {
+      DAYS.forEach(d => {
+        const day = s.days[d];
+        if (!day || day.status !== 'confirmed') return;
+        const eff = day.confirmed_shift || day.shift;
+        if (eff === 'am') dayCount[d].am++;
+        else if (eff === 'pm') dayCount[d].pm++;
+        else if (eff === 'full') dayCount[d].full++;
+      });
+    });
 
     html += `<div class="camp-section">
       <div class="camp-hdr">
         <h3>${campName}</h3>
         <div style="font-size:0.8rem">
-          <span style="color:${amOk?'#1a7a3a':'#cc0000'};font-weight:700">AM ${amCount}/${need.am}</span>
-          &nbsp;&middot;&nbsp;
-          <span style="color:${pmOk?'#1a7a3a':'#cc0000'};font-weight:700">PM ${pmCount}/${need.pm}</span>
+          <span style="color:#888;font-weight:600">Need: AM ${need.am} · PM ${need.pm}</span>
           &nbsp;&middot;&nbsp;
           <span style="color:#888">${staffArr.length} assigned</span>
         </div>
@@ -404,7 +411,17 @@ function renderSchedule() {
       html += `<div class="table-scroll"><table class="sched">
         <thead><tr>
           <th class="name-col">Staff</th><th>Role</th><th>Rating</th>
-          ${DAYS.map(d=>`<th>${d}</th>`).join('')}
+          ${DAYS.map(d => {
+            const c = dayCount[d];
+            const total = c.full + c.am + c.pm;
+            const half = [];
+            if (c.am) half.push(`<span style="color:#0066cc">AM:${c.am}</span>`);
+            if (c.pm) half.push(`<span style="color:#8844cc">PM:${c.pm}</span>`);
+            const sub = total > 0
+              ? `${total}${half.length ? ` (${half.join(' ')})` : ''}`
+              : '<span style="color:#ccc">—</span>';
+            return `<th>${d}<div style="font-size:0.68rem;font-weight:600;margin-top:2px">${sub}</div></th>`;
+          }).join('')}
           <th>BG</th><th>Response</th><th></th>
         </tr></thead><tbody>`;
       staffArr.forEach(s => {
