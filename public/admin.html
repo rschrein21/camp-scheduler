@@ -450,6 +450,7 @@ function renderCamps() {
             if (!day) return `<td>${dayBadge(null, false, d)}</td>`;
             const effShift = day.confirmed_shift || day.shift;
             const cancelled = day.status === 'cancelled';
+            if (day.status === 'declined') return `<td style="text-align:center"><span style="color:#ccc;font-size:0.72rem">—</span></td>`;
             return `<td>${dayBadge(effShift, cancelled, d)}</td>`;
           }).join('')}
           <td>

@@ -343,7 +343,8 @@ function renderCamps() {
         const label = shift === 'full' ? 'Full' : shift.toUpperCase();
         html += `<div class="conf-badge ${cls}">${label}<span class="conf-sub">Assigned</span></div>`;
       } else {
-        const val = s ? s.shift : '';
+        // Don't pre-fill if the row was declined — treat as blank so staff re-enter intentionally
+        const val = (s && s.status !== 'declined') ? s.shift : '';
         const selId = `s_${slug(camp)}_${d}`;
         const selCls = val === 'am' ? ' sel-am' : val === 'pm' ? ' sel-pm' : val === 'full' ? ' sel-full' : '';
         html += `<select id="${selId}" class="shift-sel${selCls}" onchange="onShiftChange(this)">
