@@ -1,5 +1,5 @@
 {
-  "updated": "2026-06-19T17:53:55Z",
+  "updated": "2026-06-19T18:01:44Z",
   "camps": {
     "July 6\u201310 \u00b7 Lower Woodland": {
       "am": 7,
@@ -25,9 +25,9 @@
     "June 22\u201326 \u00b7 Seattle University": {
       "am": 7,
       "pm": 6,
-      "fullDay": 55,
-      "halfDay": 8,
-      "total": 63
+      "fullDay": 57,
+      "halfDay": 9,
+      "total": 66
     },
     "July 6\u201310 \u00b7 Seattle University": {
       "am": 4,
@@ -37,18 +37,18 @@
       "total": 32
     },
     "July 13\u201317 \u00b7 Seattle University": {
-      "am": 5,
+      "am": 6,
       "pm": 4,
-      "fullDay": 36,
+      "fullDay": 37,
       "halfDay": 14,
-      "total": 50
+      "total": 51
     },
     "July 20\u201324 \u00b7 Seattle University": {
       "am": 6,
       "pm": 5,
-      "fullDay": 44,
+      "fullDay": 45,
       "halfDay": 7,
-      "total": 51
+      "total": 52
     },
     "Aug 3\u20137 \u00b7 Washington Park": {
       "am": 9,
@@ -68,8 +68,8 @@
       "am": 5,
       "pm": 4,
       "fullDay": 40,
-      "halfDay": 7,
-      "total": 47
+      "halfDay": 6,
+      "total": 46
     },
     "Aug 10\u201314 \u00b7 Issaquah": {
       "am": 2,
@@ -113,19 +113,19 @@
       "halfDay": 12,
       "total": 93
     },
-    "July 20\u201324 \u00b7 West Seattle Del Ridge": {
-      "am": 3,
-      "pm": 2,
-      "fullDay": 18,
-      "halfDay": 4,
-      "total": 22
-    },
     "Aug 17\u201321 \u00b7 West Seattle Del Ridge": {
       "am": 10,
       "pm": 8,
       "fullDay": 76,
       "halfDay": 19,
       "total": 95
+    },
+    "July 20\u201324 \u00b7 West Seattle Del Ridge": {
+      "am": 3,
+      "pm": 2,
+      "fullDay": 18,
+      "halfDay": 4,
+      "total": 22
     }
   }
 }

@@ -117,7 +117,13 @@ def get_class_map(sess):
             continue
 
         for o in cls_sel.find_all('option'):
-            if not o.get('value') or 'SUYI' in o.get_text() or 'Show All' in o.get_text():
+            if not o.get('value') or 'Show All' in o.get_text():
+                continue
+            # Skip plain Transfers and Residential (July 9-12); keep SUYI Scholarship Transfers
+            txt = o.get_text(strip=True)
+            if '07/09' in txt:
+                continue
+            if 'Transfer' in txt and 'SUYI' not in txt:
                 continue
             class_map.append({
                 'campId': camp_id, 'campName': camp_name,
