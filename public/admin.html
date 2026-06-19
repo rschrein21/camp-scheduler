@@ -396,8 +396,10 @@ function renderSchedule() {
     });
 
     html += `<div class="camp-section">
-      <div class="camp-hdr">
-        <h3>${campName}</h3>
+      <div class="camp-hdr" style="display:flex;align-items:center;justify-content:space-between">
+        <h3 style="flex:1">${campName}</h3>
+        <div style="flex:1;text-align:center;font-size:0.95rem;font-weight:700;color:#333">Need: AM ${need.am} &middot; PM ${need.pm}</div>
+        <div style="flex:1"></div>
       </div>`;
 
     if (!staffArr.length) {
@@ -413,10 +415,7 @@ function renderSchedule() {
             const sub = (amTotal > 0 || pmTotal > 0)
               ? `<span style="color:#0066cc">AM:${amTotal}(${c.am})</span> <span style="color:#8844cc">PM:${pmTotal}(${c.pm})</span>`
               : '<span style="color:#ccc">—</span>';
-            const needRow = d === 'Wed'
-              ? `<div style="font-size:0.7rem;color:#555;font-weight:600;white-space:nowrap;margin-bottom:3px;border-bottom:1px solid #e8e8e8;padding-bottom:3px">Need: AM ${need.am} · PM ${need.pm}</div>`
-              : '';
-            return `<th>${needRow}${d}<div style="font-size:0.68rem;font-weight:500;margin-top:2px;white-space:nowrap">${sub}</div></th>`;
+            return `<th>${d}<div style="font-size:0.68rem;font-weight:500;margin-top:2px;white-space:nowrap">${sub}</div></th>`;
           }).join('')}
           <th>BG</th><th>Response</th><th></th>
         </tr></thead><tbody>`;
