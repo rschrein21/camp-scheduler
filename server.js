@@ -1023,14 +1023,35 @@ async function maybeAutoConfirm(staff_id, camp) {
 
 app.post('/api/admin/status', requireAdmin, async (req, res) => {
   try {
-    const { staff_id, camp, status, confirmed_shift, req_id } = req.body;
+    const { staff_id, camp, status, confirmed_shift, req_id, notify } = req.body;
 
     if (req_id) {
       // Per-day update: update a single request row by id
+      // Fetch existing row for context before updating
+      const existingRows = await query(
+        'SELECT r.id, r.staff_id, r.camp, r.day, r.shift, r.confirmed_shift AS old_cs, s.name, s.phone, s.email FROM requests r JOIN staff s ON s.id = r.staff_id WHERE r.id = $1',
+        [req_id]
+      );
       await query(
         'UPDATE requests SET status = $1, confirmed_shift = $2 WHERE id = $3',
         [status, confirmed_shift || null, req_id]
       );
+      // Text staff if admin explicitly requested notification
+      if (notify && existingRows.length) {
+        const row = existingRows[0];
+        const shiftLabel = confirmed_shift === 'full' ? 'Full Day' : confirmed_shift === 'am' ? 'AM' : confirmed_shift === 'pm' ? 'PM' : null;
+        const digits = (row.phone || '').replace(/\D/g, '').slice(-10);
+        const e164 = digits.length === 10 ? `+1${digits}` : null;
+        const link = digits ? `${BASE_URL}/my-schedule?phone=${digits}` : BASE_URL + '/my-schedule';
+        if (e164 && twilioClient) {
+          const msg = shiftLabel
+            ? `Nike Soccer Camps: Hi ${row.name}, your schedule has been updated \u2014 ${row.day} at ${row.camp} is now ${shiftLabel}. View your full schedule: ${link}`
+            : `Nike Soccer Camps: Hi ${row.name}, your ${row.day} shift at ${row.camp} has been removed. View your full schedule: ${link}`;
+          twilioClient.messages.create({ body: msg, from: TWILIO_FROM_NUMBER, to: e164 })
+            .then(() => logNotification(row.staff_id, row.name, row.phone, 'sms', `Schedule change: ${row.day} ${shiftLabel || 'removed'}`, row.camp, 'sent'))
+            .catch(e => { console.error('Shift-change SMS error:', e.message); logNotification(row.staff_id, row.name, row.phone, 'sms', `Schedule change: ${row.day}`, row.camp, 'failed'); });
+        }
+      }
     } else {
       // Bulk camp update: update all rows for this staff+camp
       await query(

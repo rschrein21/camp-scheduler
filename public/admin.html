@@ -432,8 +432,7 @@ function renderSchedule() {
           </td>
           <td>${responseCell}</td>
           <td>
-            <button class="detail-btn" onclick="toggleDetails('${detailId}')">Details</button>
-            <button class="detail-btn" style="color:#cc0000;margin-top:3px" onclick="openAdjustDays(${s.staff_id},'${safecamp}')">Adjust</button>
+            <button class="detail-btn" onclick="toggleDetails('${detailId}')">Make Changes</button>
           </td>
         </tr>
         <tr id="${detailId}" class="detail-row" style="display:none">
@@ -693,8 +692,7 @@ function renderCamps() {
               <option value="confirmed_pm" ${dval==='confirmed_pm' ?'selected':''}>Assigned — PM Only</option>
               <option value="declined"     ${dval==='declined'     ?'selected':''}>❌ Declined</option>
             </select>
-            <button class="detail-btn" onclick="toggleDetails('${detailId}')">Details ▾</button>
-            ${s.overallStatus === 'confirmed' ? `<button class="detail-btn" style="color:#cc0000;margin-top:3px" onclick="openAdjustDays(${s.staff_id}, '${safecamp}')">Adjust Days</button>` : ''}
+            <button class="detail-btn" onclick="toggleDetails('${detailId}')">Make Changes</button>
           </td>
           <td style="text-align:center">
             <label title="Background check completed" style="cursor:pointer;display:flex;align-items:center;gap:5px;justify-content:center">
@@ -1056,10 +1054,10 @@ async function setDaySchedule(reqId, value) {
   const status = value ? 'confirmed' : 'declined';
   const confirmed_shift = value || null;
   await fetch('/api/admin/status', { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ req_id: reqId, status, confirmed_shift }) });
+    body: JSON.stringify({ req_id: reqId, status, confirmed_shift, notify: true }) });
   const cr = await fetch('/api/admin/camps');
   data.camps = await cr.json();
-  renderCamps();
+  renderSchedule(); renderPool();
 }
 
 async function setRating(staffId, rating) {
