@@ -413,14 +413,12 @@ function renderSchedule() {
           <th class="name-col">Staff</th><th>Role</th><th>Rating</th>
           ${DAYS.map(d => {
             const c = dayCount[d];
-            const total = c.full + c.am + c.pm;
-            const half = [];
-            if (c.am) half.push(`<span style="color:#0066cc">AM:${c.am}</span>`);
-            if (c.pm) half.push(`<span style="color:#8844cc">PM:${c.pm}</span>`);
-            const sub = total > 0
-              ? `${total}${half.length ? ` (${half.join(' ')})` : ''}`
+            const amTotal = c.full + c.am;
+            const pmTotal = c.full + c.pm;
+            const sub = (amTotal > 0 || pmTotal > 0)
+              ? `<span style="color:#0066cc">AM:${amTotal}(${c.am})</span> <span style="color:#8844cc">PM:${pmTotal}(${c.pm})</span>`
               : '<span style="color:#ccc">—</span>';
-            return `<th>${d}<div style="font-size:0.68rem;font-weight:600;margin-top:2px">${sub}</div></th>`;
+            return `<th>${d}<div style="font-size:0.68rem;font-weight:500;margin-top:2px;white-space:nowrap">${sub}</div></th>`;
           }).join('')}
           <th>BG</th><th>Response</th><th></th>
         </tr></thead><tbody>`;
