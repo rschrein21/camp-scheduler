@@ -143,9 +143,11 @@
   <div class="tabs">
     <div class="tab active" onclick="switchTab('schedule')">Schedule</div>
     <div class="tab" onclick="switchTab('pool')">Availability Pool</div>
+    <div class="tab" onclick="switchTab('today')">Today</div>
     <div class="tab" onclick="switchTab('staff')">By Staff</div>
     <div class="tab" onclick="switchTab('openShifts')">Open Shifts</div>
     <div class="tab" onclick="switchTab('directors')">Directors</div>
+    <div class="tab" onclick="switchTab('log')">Log</div>
   </div>
   <div style="background:#e8f4ff;border-bottom:1px solid #b3d7ff;padding:8px 24px;font-size:0.8rem;color:#004499">
     ℹ️ Confirmation emails send automatically when you confirm a staff member. Use the <strong>Resend</strong> button on individual staff if needed.
@@ -153,10 +155,12 @@
   <div class="content">
     <div id="scheduleView"></div>
     <div id="poolView" style="display:none"></div>
+    <div id="todayView" style="display:none"></div>
     <div id="campsView" style="display:none"></div>
     <div id="dailySummaryView" style="display:none"></div>
     <div id="staffView" style="display:none"></div>
     <div id="openShiftsView" style="display:none"></div>
+    <div id="logView" style="display:none"></div>
     <div id="directorsView" style="display:none">
       <div class="directors-section">
         <h3 style="font-size:0.9rem;font-weight:700;margin-bottom:12px">Add Director</h3>
@@ -270,16 +274,19 @@ async function login() {
 async function logout() { await fetch('/api/admin/logout', {method:'POST'}); location.reload(); }
 
 function switchTab(tab) {
-  document.querySelectorAll('.tab').forEach((t,i) => {
-    t.classList.toggle('active', (['schedule','pool','staff','openShifts','directors'][i]) === tab);
-  });
+  const TABS = ['schedule','pool','today','staff','openShifts','directors','log'];
+  document.querySelectorAll('.tab').forEach((t,i) => { t.classList.toggle('active', TABS[i] === tab); });
   document.getElementById('scheduleView').style.display = tab==='schedule' ? '' : 'none';
   document.getElementById('poolView').style.display = tab==='pool' ? '' : 'none';
+  document.getElementById('todayView').style.display = tab==='today' ? '' : 'none';
   document.getElementById('staffView').style.display = tab==='staff' ? '' : 'none';
   document.getElementById('openShiftsView').style.display = tab==='openShifts' ? '' : 'none';
   document.getElementById('directorsView').style.display = tab==='directors' ? '' : 'none';
+  document.getElementById('logView').style.display = tab==='log' ? '' : 'none';
   if (tab === 'directors') loadDirectors();
   if (tab === 'openShifts') loadOpenShifts();
+  if (tab === 'today') loadToday();
+  if (tab === 'log') loadLog();
 }
 
 async function load() {
@@ -1334,6 +1341,196 @@ async function fillShift(open_req_id, sub_staff_id, camp, day, shift, btn) {
     btn.disabled = false;
     btn.textContent = 'Assign';
   }
+}
+
+// ── Today Tab ─────────────────────────────────────────────────────
+const CAMP_TO_DATES = {
+  'June 15–19 · Seattle University': {start:'2026-06-15', end:'2026-06-19'},
+  'June 22–26 · Seattle University': {start:'2026-06-22', end:'2026-06-26'},
+  'June 22–26 · West Seattle Del Ridge': {start:'2026-06-22', end:'2026-06-26'},
+  'July 6–10 · Seattle University': {start:'2026-07-06', end:'2026-07-10'},
+  'July 6–10 · Lower Woodland': {start:'2026-07-06', end:'2026-07-10'},
+  'July 6–10 · Kirkland': {start:'2026-07-06', end:'2026-07-10'},
+  'July 13–17 · Seattle University': {start:'2026-07-13', end:'2026-07-17'},
+  'July 13–17 · West Seattle Hiawatha': {start:'2026-07-13', end:'2026-07-17'},
+  'July 13–17 · Issaquah': {start:'2026-07-13', end:'2026-07-17'},
+  'July 20–24 · Seattle University': {start:'2026-07-20', end:'2026-07-24'},
+  'July 20–24 · West Seattle Del Ridge': {start:'2026-07-20', end:'2026-07-24'},
+  'July 20–24 · Bothell': {start:'2026-07-20', end:'2026-07-24'},
+  'Aug 3–7 · Washington Park': {start:'2026-08-03', end:'2026-08-07'},
+  'Aug 3–7 · Bellevue': {start:'2026-08-03', end:'2026-08-07'},
+  'Aug 10–14 · Lower Woodland': {start:'2026-08-10', end:'2026-08-14'},
+  'Aug 10–14 · Issaquah': {start:'2026-08-10', end:'2026-08-14'},
+  'Aug 17–21 · West Seattle Del Ridge': {start:'2026-08-17', end:'2026-08-21'},
+  'Aug 17–21 · Bellevue': {start:'2026-08-17', end:'2026-08-21'},
+};
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+async function loadToday() {
+  const el = document.getElementById('todayView');
+  el.innerHTML = '<div class="empty">Loading…</div>';
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const todayDow = DOW[today.getDay()];
+
+  // Find camps running today
+  const activeCamps = Object.entries(CAMP_TO_DATES)
+    .filter(([, d]) => todayStr >= d.start && todayStr <= d.end)
+    .map(([name]) => name);
+
+  if (!activeCamps.length) {
+    el.innerHTML = `<div style="background:#fff;border-radius:10px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,0.06);text-align:center;color:#888">
+      <div style="font-size:2rem;margin-bottom:8px">🏖️</div>
+      <div style="font-weight:700">No camps today</div>
+      <div style="font-size:0.82rem;margin-top:6px">${today.toLocaleDateString('en-US', {weekday:'long',month:'long',day:'numeric'})}</div>
+    </div>`;
+    return;
+  }
+
+  // Get all confirmed staff for today's camps
+  const r = await fetch('/api/admin/camps');
+  const allCampRows = await r.json();
+
+  let html = `<div style="font-size:0.78rem;color:#888;margin-bottom:12px;font-weight:600">
+    ${today.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'})} &mdash; ${activeCamps.length} active camp${activeCamps.length > 1 ? 's' : ''}
+  </div>`;
+
+  // Pending texts preview section
+  html += `<div id="pendingTextsSection" style="background:#fff;border-radius:10px;padding:16px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:0.88rem;font-weight:700">📱 Pending Texts</div>
+      <button onclick="sendPendingTexts()" id="sendTextsBtn" style="padding:6px 14px;background:#1a7a3a;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer">Send Now</button>
+    </div>
+    <div id="pendingTextsList"><div style="font-size:0.82rem;color:#aaa">Loading…</div></div>
+  </div>`;
+
+  activeCamps.forEach(campName => {
+    const campRows = allCampRows.filter(r => r.camp === campName && r.status === 'confirmed');
+    if (!campRows.length) return;
+
+    // Build staff map
+    const staffMap = {};
+    campRows.forEach(r => {
+      if (!staffMap[r.staff_id]) staffMap[r.staff_id] = { name: r.name, phone: r.phone, email: r.email, days: {}, confirmStatus: '' };
+      staffMap[r.staff_id].days[r.day] = r.confirmed_shift || r.shift;
+      if (r.schedule_confirmed_at) staffMap[r.staff_id].confirmStatus = 'confirmed';
+      else if (r.schedule_updated_at) staffMap[r.staff_id].confirmStatus = 'updated';
+      else staffMap[r.staff_id].confirmStatus = 'awaiting';
+    });
+
+    const todayStaff = Object.values(staffMap).filter(s => s.days[todayDow]);
+    if (!todayStaff.length) return;
+
+    const [datePart, location] = campName.split(' · ');
+    html += `<div style="background:#fff;border-radius:10px;margin-bottom:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+      <div style="padding:12px 16px;background:#f8f8f8;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:0.9rem;font-weight:700">${location}</div>
+          <div style="font-size:0.78rem;color:#888">${datePart} &mdash; ${todayDow}</div>
+        </div>
+        <div style="font-size:0.82rem;font-weight:700;color:#1a7a3a">${todayStaff.length} staff today</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+        <tr style="background:#fafafa">
+          <th style="padding:7px 12px;text-align:left;font-weight:600;color:#888;font-size:0.73rem;border-bottom:1px solid #eee">Name</th>
+          <th style="padding:7px 12px;text-align:left;font-weight:600;color:#888;font-size:0.73rem;border-bottom:1px solid #eee">Shift</th>
+          <th style="padding:7px 12px;text-align:left;font-weight:600;color:#888;font-size:0.73rem;border-bottom:1px solid #eee">Phone</th>
+          <th style="padding:7px 12px;text-align:left;font-weight:600;color:#888;font-size:0.73rem;border-bottom:1px solid #eee">Status</th>
+        </tr>`;
+
+    todayStaff.sort((a,b) => a.name.localeCompare(b.name)).forEach(s => {
+      const shift = s.days[todayDow];
+      const shiftBadge = shift === 'full' ? '<span style="background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:8px;font-weight:700">Full</span>'
+        : shift === 'am' ? '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:8px;font-weight:700">AM</span>'
+        : '<span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:8px;font-weight:700">PM</span>';
+      const statusBadge = s.confirmStatus === 'confirmed' ? '<span style="color:#1a7a3a;font-weight:700">✅ Confirmed</span>'
+        : s.confirmStatus === 'updated' ? '<span style="color:#e06c00;font-weight:700">✏️ Updated</span>'
+        : '<span style="color:#888">⏳ Awaiting</span>';
+      const phone = s.phone || '';
+      const digits = phone.replace(/\D/g,'').slice(-10);
+      const tel = digits ? `<a href="tel:+1${digits}" style="color:#0066cc;text-decoration:none">${phone}</a>` : '<span style="color:#ccc">—</span>';
+      html += `<tr style="border-bottom:1px solid #f5f5f5">
+        <td style="padding:8px 12px;font-weight:600">${s.name}</td>
+        <td style="padding:8px 12px">${shiftBadge}</td>
+        <td style="padding:8px 12px">${tel}</td>
+        <td style="padding:8px 12px">${statusBadge}</td>
+      </tr>`;
+    });
+    html += `</table></div>`;
+  });
+
+  el.innerHTML = html;
+
+  // Load pending texts
+  const pr = await fetch('/api/admin/pending-texts-preview');
+  const pending = pr.ok ? await pr.json() : [];
+  const ptEl = document.getElementById('pendingTextsList');
+  if (!ptEl) return;
+  if (!pending.length) {
+    ptEl.innerHTML = '<div style="font-size:0.82rem;color:#aaa">✅ No pending texts — everyone has been reached.</div>';
+    document.getElementById('sendTextsBtn').style.display = 'none';
+  } else {
+    ptEl.innerHTML = pending.map(p =>
+      `<div style="font-size:0.82rem;padding:3px 0;border-bottom:1px solid #f5f5f5">⏳ ${p.name} &mdash; ${p.camp}</div>`
+    ).join('');
+  }
+}
+
+async function sendPendingTexts() {
+  const btn = document.getElementById('sendTextsBtn');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  const r = await fetch('/api/admin/send-pending-texts', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
+  const result = r.ok ? await r.json() : {};
+  btn.textContent = `Sent ${result.sent || 0}`;
+  setTimeout(() => loadToday(), 1000);
+}
+
+// ── Log Tab ─────────────────────────────────────────────────────
+async function loadLog() {
+  const el = document.getElementById('logView');
+  el.innerHTML = '<div class="empty">Loading…</div>';
+  const r = await fetch('/api/admin/notification-log?limit=300');
+  if (!r.ok) { el.innerHTML = '<div class="empty">Error loading log.</div>'; return; }
+  const rows = await r.json();
+  if (!rows.length) { el.innerHTML = '<div class="empty">No notifications sent yet.</div>'; return; }
+  let html = `<div style="background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+    <div style="padding:12px 16px;background:#f8f8f8;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:0.9rem;font-weight:700">📋 Notification Log</div>
+      <div style="font-size:0.78rem;color:#888">${rows.length} entries</div>
+    </div>
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+      <tr style="background:#fafafa">
+        <th style="padding:7px 12px;text-align:left;font-weight:600;color:#888;font-size:0.72rem;border-bottom:1px solid #eee">Time</th>
+        <th style="padding:7px 12px;text-align:left;font-weight:600;color:#888;font-size:0.72rem;border-bottom:1px solid #eee">Staff</th>
+        <th style="padding:7px 12px;text-align:left;font-weight:600;color:#888;font-size:0.72rem;border-bottom:1px solid #eee">Channel</th>
+        <th style="padding:7px 12px;text-align:left;font-weight:600;color:#888;font-size:0.72rem;border-bottom:1px solid #eee">Recipient</th>
+        <th style="padding:7px 12px;text-align:left;font-weight:600;color:#888;font-size:0.72rem;border-bottom:1px solid #eee">Message</th>
+        <th style="padding:7px 12px;text-align:left;font-weight:600;color:#888;font-size:0.72rem;border-bottom:1px solid #eee">Camp</th>
+        <th style="padding:7px 12px;text-align:left;font-weight:600;color:#888;font-size:0.72rem;border-bottom:1px solid #eee">Status</th>
+      </tr>`;
+  rows.forEach(row => {
+    const ts = new Date(row.sent_at).toLocaleString('en-US', {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+    const chBadge = row.channel === 'sms'
+      ? '<span style="background:#dbeafe;color:#1d4ed8;padding:1px 7px;border-radius:6px;font-weight:700;font-size:0.72rem">SMS</span>'
+      : '<span style="background:#f0fdf4;color:#15803d;padding:1px 7px;border-radius:6px;font-weight:700;font-size:0.72rem">Email</span>';
+    const stBadge = row.status === 'sent'
+      ? '<span style="color:#1a7a3a;font-weight:700">✅</span>'
+      : '<span style="color:#cc0000;font-weight:700">❌</span>';
+    html += `<tr style="border-bottom:1px solid #f5f5f5">
+      <td style="padding:7px 12px;white-space:nowrap;color:#888">${ts}</td>
+      <td style="padding:7px 12px;font-weight:600">${row.staff_name}</td>
+      <td style="padding:7px 12px">${chBadge}</td>
+      <td style="padding:7px 12px;color:#555;font-size:0.75rem">${row.recipient}</td>
+      <td style="padding:7px 12px;color:#555">${row.message}</td>
+      <td style="padding:7px 12px;color:#888;font-size:0.78rem">${row.camp}</td>
+      <td style="padding:7px 12px">${stBadge}</td>
+    </tr>`;
+  });
+  html += `</table></div></div>`;
+  el.innerHTML = html;
 }
 </script>
 <div id="staffPopover"><div class="pop-title"></div><ul></ul></div>

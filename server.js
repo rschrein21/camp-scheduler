@@ -129,28 +129,45 @@ async function sendConfirmationSMS(staffPhone, camp) {
 }
 
 // SMS-first: try SMS, always send email as backup
-async function sendConfirmationNotification(staffName, staffEmail, staffPhone, camp, shift) {
+async function sendConfirmationNotification(staffName, staffEmail, staffPhone, camp, shift, staffId) {
   const result = { smsSent: false, emailSent: false };
   // 1. SMS (primary)
   if (staffPhone && twilioClient) {
     try {
       result.smsSent = await sendConfirmationSMS(staffPhone, camp);
+      if (result.smsSent) {
+        logNotification(staffId, staffName, staffPhone, 'sms', `Assigned for ${camp}`, camp, 'sent');
+      }
     } catch (e) {
       console.error('SMS error:', e.message);
+      logNotification(staffId, staffName, staffPhone, 'sms', `Assigned for ${camp}`, camp, 'failed');
     }
   }
   // 2. Email (always send as backup / for record-keeping)
   if (staffEmail) {
     try {
       result.emailSent = await sendConfirmationEmail(staffName, staffEmail, camp, staffPhone, shift);
+      if (result.emailSent) {
+        logNotification(staffId, staffName, staffEmail, 'email', `Confirmation: ${camp}`, camp, 'sent');
+      }
     } catch (e) {
       console.error('Email error:', e.message);
+      logNotification(staffId, staffName, staffEmail, 'email', `Confirmation: ${camp}`, camp, 'failed');
     }
   }
   if (!result.smsSent && !result.emailSent) {
     console.warn(`No notification sent for ${staffName} / ${camp} — no SMS config and no email transport`);
   }
   return result;
+}
+
+// ── Notification logging ─────────────────────────────────
+function logNotification(staffId, staffName, recipient, channel, message, camp, status) {
+  const ts = IS_PG ? 'NOW()' : 'CURRENT_TIMESTAMP';
+  query(
+    `INSERT INTO notification_log (staff_id, staff_name, recipient, channel, message, camp, status, sent_at) VALUES ($1,$2,$3,$4,$5,$6,$7,${ts})`,
+    [staffId || null, staffName || '', recipient || '', channel, message, camp || '', status]
+  ).catch(e => console.warn('Notification log error:', e.message));
 }
 
 // ── Database setup ────────────────────────────────────────
@@ -232,6 +249,17 @@ if (IS_PG) {
         action TEXT NOT NULL DEFAULT 'updated',
         submitted_at TIMESTAMPTZ DEFAULT NOW(),
         sent INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE IF NOT EXISTS notification_log (
+        id SERIAL PRIMARY KEY,
+        staff_id INTEGER,
+        staff_name TEXT NOT NULL,
+        recipient TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        message TEXT NOT NULL,
+        camp TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'sent',
+        sent_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
     // Migrations: add columns that may be missing from tables created before schema updates
@@ -368,6 +396,17 @@ if (IS_PG) {
       action TEXT NOT NULL DEFAULT 'updated',
       submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       sent INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS notification_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      staff_id INTEGER,
+      staff_name TEXT NOT NULL,
+      recipient TEXT NOT NULL,
+      channel TEXT NOT NULL,
+      message TEXT NOT NULL,
+      camp TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'sent',
+      sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
@@ -971,7 +1010,7 @@ async function maybeAutoConfirm(staff_id, camp) {
         [staff_id, camp, token]
       );
     }
-    sendConfirmationNotification(name, email, phone, camp, shift).then(async ({ smsSent, emailSent }) => {
+    sendConfirmationNotification(name, email, phone, camp, shift, staff_id).then(async ({ smsSent, emailSent }) => {
       if (IS_PG) {
         await query(
           'UPDATE staff_confirmations SET email_sent_at = CASE WHEN $1 THEN NOW() ELSE email_sent_at END, sms_sent_at = CASE WHEN $2 THEN NOW() ELSE sms_sent_at END WHERE staff_id = $3 AND camp = $4',
@@ -1302,9 +1341,16 @@ app.get('/api/staff/schedule', async (req, res) => {
   }
 });
 
-// Serve staff-confirm page
+// Legacy staff-confirm page → redirect to my-schedule
 app.get('/staff-confirm', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'staff-confirm.html'));
+  const token = req.query.token;
+  if (token) return res.redirect(`/my-schedule`);
+  res.redirect('/my-schedule');
+});
+
+// Legacy staff-manage page → redirect to my-schedule
+app.get('/staff-manage', (req, res) => {
+  res.redirect('/my-schedule');
 });
 
 // ── Staff Confirmation (public, token-based) ────────────────────────
@@ -1426,6 +1472,76 @@ app.post('/api/admin/test-sms', requireAdmin, async (req, res) => {
   }
 });
 
+// GET /api/admin/notification-log — audit trail of all sent notifications
+app.get('/api/admin/notification-log', requireAdmin, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 200;
+    const rows = await query(
+      'SELECT * FROM notification_log ORDER BY sent_at DESC LIMIT $1',
+      [limit]
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET /api/admin/pending-texts-preview — preview who would get texted by the auto-sender
+app.get('/api/admin/pending-texts-preview', requireAdmin, async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT sc.staff_id, sc.camp, s.name, s.phone
+      FROM staff_confirmations sc
+      JOIN staff s ON sc.staff_id = s.id
+      WHERE sc.email_sent_at IS NOT NULL
+        AND sc.sms_sent_at IS NULL
+        AND s.phone IS NOT NULL
+        AND s.phone != ''
+      ORDER BY sc.camp, s.name
+    `);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/admin/send-pending-texts — manually trigger texts to pending staff (gated)
+app.post('/api/admin/send-pending-texts', requireAdmin, async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT sc.staff_id, sc.camp, s.name, s.phone, s.email
+      FROM staff_confirmations sc
+      JOIN staff s ON sc.staff_id = s.id
+      WHERE sc.email_sent_at IS NOT NULL
+        AND sc.sms_sent_at IS NULL
+        AND s.phone IS NOT NULL
+        AND s.phone != ''
+      ORDER BY sc.camp, s.name
+    `);
+    if (!rows.length) return res.json({ ok: true, sent: 0 });
+    let sent = 0;
+    const results = [];
+    for (const row of rows) {
+      try {
+        const digits = row.phone.replace(/\D/g, '');
+        const e164 = digits.length === 10 ? `+1${digits}` : `+${digits}`;
+        const link = `${BASE_URL}/my-schedule?phone=${digits.slice(-10)}`;
+        if (twilioClient) {
+          await twilioClient.messages.create({
+            body: `Nike Soccer Camps: Hi ${row.name}, you're confirmed for ${row.camp}. View your schedule: ${link}`,
+            from: TWILIO_FROM_NUMBER,
+            to: e164
+          });
+          await query('UPDATE staff_confirmations SET sms_sent_at = NOW() WHERE staff_id = $1 AND camp = $2', [row.staff_id, row.camp]);
+          logNotification(row.staff_id, row.name, row.phone, 'sms', `Assigned for ${row.camp}`, row.camp, 'sent');
+          sent++;
+          results.push({ name: row.name, camp: row.camp, phone: row.phone });
+        }
+      } catch (e) {
+        logNotification(row.staff_id, row.name, row.phone, 'sms', `Assigned for ${row.camp}`, row.camp, 'failed');
+        results.push({ name: row.name, camp: row.camp, error: e.message });
+      }
+    }
+    res.json({ ok: true, sent, total: rows.length, results });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
 // GET /api/admin/sms-status — check Twilio + email config
 app.get('/api/admin/sms-status', requireAdmin, (req, res) => {
   res.json({
@@ -1523,7 +1639,7 @@ app.post('/api/admin/resend-confirmation', requireAdmin, async (req, res) => {
         ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, confirmed = FALSE, confirmed_at = NULL, email_sent_at = NULL, sms_sent_at = NULL
       `, [staff_id, camp, token]);
     }
-    sendConfirmationNotification(name, email, phone, camp, shift).then(async ({ smsSent, emailSent }) => {
+    sendConfirmationNotification(name, email, phone, camp, shift, staff_id).then(async ({ smsSent, emailSent }) => {
       if (IS_PG) {
         await query(
           'UPDATE staff_confirmations SET email_sent_at = CASE WHEN $1 THEN NOW() ELSE email_sent_at END, sms_sent_at = CASE WHEN $2 THEN NOW() ELSE sms_sent_at END WHERE staff_id = $3 AND camp = $4',
@@ -1811,7 +1927,7 @@ app.post('/api/admin/fill-open-shift', requireAdmin, async (req, res) => {
         VALUES ($1,$2,$3)
         ON CONFLICT (staff_id, camp) DO UPDATE SET token = EXCLUDED.token, confirmed = FALSE, confirmed_at = NULL, email_sent_at = NULL, sms_sent_at = NULL
       `, [sub_staff_id, camp, token]);
-      sendConfirmationNotification(name, email, phone, camp, shift).then(async ({ smsSent, emailSent }) => {
+      sendConfirmationNotification(name, email, phone, camp, shift, sub_staff_id).then(async ({ smsSent, emailSent }) => {
         await query(
           'UPDATE staff_confirmations SET email_sent_at = CASE WHEN $1 THEN NOW() ELSE email_sent_at END, sms_sent_at = CASE WHEN $2 THEN NOW() ELSE sms_sent_at END WHERE staff_id = $3 AND camp = $4',
           [emailSent, smsSent, sub_staff_id, camp]

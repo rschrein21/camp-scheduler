@@ -320,7 +320,18 @@ function renderCamps() {
   let html = '';
   let lastWeek = null;
 
-  CAMP_ORDER.forEach(camp => {
+  // Only show camps where staff has at least one request (assigned or pending)
+  const activeCamps = CAMP_ORDER.filter(c => {
+    const days = campState[c] || {};
+    return Object.keys(days).length > 0;
+  });
+
+  if (!activeCamps.length) {
+    document.getElementById('campsContainer').innerHTML = '<div class="empty">No camp assignments yet. Check back after your schedule has been confirmed.</div>';
+    return;
+  }
+
+  activeCamps.forEach(camp => {
     const week = weekOf(camp);
     if (week !== lastWeek) {
       html += `<div class="week-divider">${week}</div>`;
@@ -476,9 +487,10 @@ async function saveSchedule() {
   saveBtn.disabled = true;
   saveBtn.textContent = 'Saving…';
 
-  // Collect all non-confirmed selections
+  // Collect all non-confirmed selections (only from rendered camps)
   const shifts = [];
-  CAMP_ORDER.forEach(camp => {
+  const activeCamps = CAMP_ORDER.filter(c => Object.keys(campState[c] || {}).length > 0);
+  activeCamps.forEach(camp => {
     DAYS.forEach(d => {
       const s = (campState[camp] || {})[d];
       if (s && s.status === 'confirmed') return; // leave confirmed alone
