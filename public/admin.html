@@ -438,16 +438,18 @@ function renderSchedule() {
         <tr id="${detailId}" class="detail-row" style="display:none">
           <td colspan="${DAYS.length+6}">
             <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
-              ${DAYS.map(d => {
-                const day = s.days[d]; if (!day) return '';
+              ${DAYS.map((d, idx) => {
+                const day = s.days[d];
+                const saveBtn = idx === 2 ? `<tr><td colspan="3" style="padding:8px 0 4px 50px"><button id="save-${detailId}" onclick="saveChanges('${detailId}',${s.staff_id},'${safecamp}')" style="padding:7px 18px;background:#1a7a3a;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer">Save Changes</button></td></tr>` : '';
+                if (!day) return saveBtn;
                 const selCS = day.status==='confirmed' ? (day.confirmed_shift||day.shift) : '';
                 return `<tr><td style="width:50px;font-weight:700">${d}</td>
-                  <td><select style="padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:0.75rem" onchange="setDaySchedule(${day.req_id},this.value)">
+                  <td><select data-orig="${selCS}" data-reqid="${day.req_id}" data-day="${d}" style="padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:0.75rem" onchange="markPendingChange(this)">
                     <option value="" ${selCS===''?'selected':''}>— None</option>
                     <option value="am" ${selCS==='am'?'selected':''}>AM</option>
                     <option value="pm" ${selCS==='pm'?'selected':''}>PM</option>
                     <option value="full" ${selCS==='full'?'selected':''}>Full Day</option>
-                  </select></td></tr>`;
+                  </select></td><td></td></tr>${saveBtn}`;
               }).join('')}
             </table>
           </td>
@@ -717,9 +719,10 @@ function renderCamps() {
         <tr id="${detailId}" class="detail-row" style="display:none">
           <td colspan="${DAYS.length + 5}">
             <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
-              ${DAYS.map(d => {
+              ${DAYS.map((d, idx) => {
                 const day = s.days[d];
-                if (!day) return '';
+                const saveBtn = idx === 2 ? `<tr><td colspan="4" style="padding:8px 0 4px 50px"><button id="save-${detailId}" onclick="saveChanges('${detailId}',${s.staff_id},'${safecamp}')" style="padding:7px 18px;background:#1a7a3a;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer">Save Changes</button></td></tr>` : '';
+                if (!day) return saveBtn;
                 const effShift = day.confirmed_shift || day.shift;
                 // Effective selected value: confirmed_shift if confirmed, submitted shift as fallback, '' = None
                 const selCS = day.status === 'confirmed'
@@ -738,14 +741,15 @@ function renderCamps() {
                   <td style="width:50px;font-weight:700">${d}</td>
                   <td style="font-size:0.78rem">${changeLabel}</td>
                   <td>
-                    <select style="padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:0.75rem;cursor:pointer" onchange="setDaySchedule(${day.req_id}, this.value)">
+                    <select data-orig="${selCS}" data-reqid="${day.req_id}" data-day="${d}" style="padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:0.75rem;cursor:pointer" onchange="markPendingChange(this)">
                       <option value=""    ${selCS===''    ?'selected':''}>— None</option>
                       <option value="am"  ${selCS==='am'  ?'selected':''}>AM</option>
                       <option value="pm"  ${selCS==='pm'  ?'selected':''}>PM</option>
                       <option value="full" ${selCS==='full'?'selected':''}>Full Day</option>
                     </select>
                   </td>
-                </tr>`;
+                  <td></td>
+                </tr>${saveBtn}`;
               }).join('')}
             </table>
           </td>
@@ -1049,12 +1053,53 @@ function toggleDetails(detailId) {
   if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
 }
 
+// Highlight a dropdown that has a pending (unsaved) change
+function markPendingChange(sel) {
+  const changed = sel.value !== sel.dataset.orig;
+  sel.style.background = changed ? '#fffbdb' : '';
+  sel.style.borderColor = changed ? '#d4a017' : '';
+  sel.style.fontWeight  = changed ? '700'     : '';
+}
+
+// Save all changes in a detail row + text the staff member
+async function saveChanges(detailId, staffId, camp) {
+  const btn = document.getElementById('save-' + detailId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  const detailRow = document.getElementById(detailId);
+  const selects = detailRow ? detailRow.querySelectorAll('select[data-reqid]') : [];
+  const updates = [];
+  selects.forEach(sel => {
+    const reqId  = parseInt(sel.dataset.reqid);
+    const day    = sel.dataset.day;
+    const value  = sel.value;
+    updates.push({ req_id: reqId, day, status: value ? 'confirmed' : 'declined', confirmed_shift: value || null });
+  });
+  if (!updates.length) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
+    return;
+  }
+  const r = await fetch('/api/admin/batch-update-days', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ updates, staff_id: staffId, camp, notify: true })
+  });
+  if (r.ok) {
+    if (btn) { btn.textContent = '✅ Saved — coach texted'; btn.style.background = '#1a5c36'; }
+    selects.forEach(sel => { sel.style.background = ''; sel.style.borderColor = ''; sel.style.fontWeight = ''; sel.dataset.orig = sel.value; });
+    const cr = await fetch('/api/admin/camps');
+    data.camps = await cr.json();
+    renderSchedule(); renderPool();
+  } else {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
+    alert('Error saving changes.');
+  }
+}
+
+// Legacy per-day update (used by direct API callers, not the detail rows)
 async function setDaySchedule(reqId, value) {
-  // value = '' (None/not working) | 'am' | 'pm' | 'full'
   const status = value ? 'confirmed' : 'declined';
   const confirmed_shift = value || null;
   await fetch('/api/admin/status', { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ req_id: reqId, status, confirmed_shift, notify: true }) });
+    body: JSON.stringify({ req_id: reqId, status, confirmed_shift }) });
   const cr = await fetch('/api/admin/camps');
   data.camps = await cr.json();
   renderSchedule(); renderPool();

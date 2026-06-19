@@ -1493,6 +1493,46 @@ app.post('/api/admin/test-sms', requireAdmin, async (req, res) => {
   }
 });
 
+// POST /api/admin/batch-update-days — save multiple day changes at once + text staff
+app.post('/api/admin/batch-update-days', requireAdmin, async (req, res) => {
+  try {
+    const { updates, staff_id, camp, notify } = req.body;
+    // updates: [{req_id, day, status, confirmed_shift}]
+    if (!Array.isArray(updates) || !updates.length) return res.status(400).json({ error: 'updates required' });
+    for (const u of updates) {
+      await query(
+        'UPDATE requests SET status = $1, confirmed_shift = $2 WHERE id = $3',
+        [u.status, u.confirmed_shift || null, u.req_id]
+      );
+    }
+    if (notify && staff_id && camp) {
+      try {
+        const staffRows = await query('SELECT name, phone, email FROM staff WHERE id = $1', [staff_id]);
+        if (staffRows.length) {
+          const { name, phone, email } = staffRows[0];
+          const digits = (phone || '').replace(/\D/g, '').slice(-10);
+          const e164 = digits.length === 10 ? `+1${digits}` : null;
+          const link = digits ? `${BASE_URL}/my-schedule?phone=${digits}` : `${BASE_URL}/my-schedule`;
+          const changeLines = updates.map(u => {
+            const label = u.confirmed_shift === 'full' ? 'Full Day'
+              : u.confirmed_shift === 'am' ? 'AM'
+              : u.confirmed_shift === 'pm' ? 'PM'
+              : 'removed';
+            return `${u.day}: ${label}`;
+          }).join(', ');
+          const msg = `Nike Soccer Camps: Hi ${name}, your schedule for ${camp} has been updated \u2014 ${changeLines}. See your full schedule: ${link}`;
+          if (e164 && twilioClient) {
+            twilioClient.messages.create({ body: msg, from: TWILIO_FROM_NUMBER, to: e164 })
+              .then(() => logNotification(staff_id, name, phone, 'sms', `Schedule update: ${changeLines}`, camp, 'sent'))
+              .catch(e => { console.error('Batch notify SMS error:', e.message); logNotification(staff_id, name, phone, 'sms', `Schedule update`, camp, 'failed'); });
+          }
+        }
+      } catch (e) { console.error('Batch notify error:', e.message); }
+    }
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
 // GET /api/admin/notification-log — audit trail of all sent notifications
 app.get('/api/admin/notification-log', requireAdmin, async (req, res) => {
   try {
