@@ -101,6 +101,18 @@
 </head>
 <body>
 
+<!-- Assign modal -->
+<div id="assignModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;margin:20px;max-width:380px;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="font-size:1rem" id="assignModalTitle">Assign Staff</h3>
+      <button onclick="closeAssignModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#aaa">&times;</button>
+    </div>
+    <p style="font-size:0.82rem;color:#666;margin-bottom:16px" id="assignModalDesc"></p>
+    <div style="display:flex;flex-direction:column;gap:8px" id="assignModalBtns"></div>
+  </div>
+</div>
+
 <!-- Sub picker modal -->
 <div id="subPickerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:12px;padding:24px;margin:20px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto">
@@ -129,8 +141,8 @@
     <button class="logout-btn" onclick="logout()">Log Out</button>
   </header>
   <div class="tabs">
-    <div class="tab active" onclick="switchTab('camps')">By Camp</div>
-    <div class="tab" onclick="switchTab('daily')" style="display:none">Daily Summary</div>
+    <div class="tab active" onclick="switchTab('schedule')">Schedule</div>
+    <div class="tab" onclick="switchTab('pool')">Availability Pool</div>
     <div class="tab" onclick="switchTab('staff')">By Staff</div>
     <div class="tab" onclick="switchTab('openShifts')">Open Shifts</div>
     <div class="tab" onclick="switchTab('directors')">Directors</div>
@@ -139,7 +151,9 @@
     ℹ️ Confirmation emails send automatically when you confirm a staff member. Use the <strong>Resend</strong> button on individual staff if needed.
   </div>
   <div class="content">
-    <div id="campsView"></div>
+    <div id="scheduleView"></div>
+    <div id="poolView" style="display:none"></div>
+    <div id="campsView" style="display:none"></div>
     <div id="dailySummaryView" style="display:none"></div>
     <div id="staffView" style="display:none"></div>
     <div id="openShiftsView" style="display:none"></div>
@@ -197,6 +211,26 @@
 
 <script>
 const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+const CAMP_ORDER = [
+  'June 15–19 · Seattle University',
+  'June 22–26 · Seattle University',
+  'June 22–26 · West Seattle Del Ridge',
+  'July 6–10 · Seattle University',
+  'July 6–10 · Lower Woodland',
+  'July 6–10 · Kirkland',
+  'July 13–17 · Seattle University',
+  'July 13–17 · West Seattle Hiawatha',
+  'July 13–17 · Issaquah',
+  'July 20–24 · Seattle University',
+  'July 20–24 · West Seattle Del Ridge',
+  'July 20–24 · Bothell',
+  'Aug 3–7 · Washington Park',
+  'Aug 3–7 · Bellevue',
+  'Aug 10–14 · Lower Woodland',
+  'Aug 10–14 · Issaquah',
+  'Aug 17–21 · West Seattle Del Ridge',
+  'Aug 17–21 · Bellevue',
+];
 // Staff needs auto-updated from USSC enrollment (1 staff per 10 campers)
 // AM = all campers; PM = Full Day campers only
 const CAMP_NEEDS = {
@@ -237,16 +271,15 @@ async function logout() { await fetch('/api/admin/logout', {method:'POST'}); loc
 
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach((t,i) => {
-    t.classList.toggle('active', (['camps','daily','staff','openShifts','directors'][i]) === tab);
+    t.classList.toggle('active', (['schedule','pool','staff','openShifts','directors'][i]) === tab);
   });
-  document.getElementById('campsView').style.display = tab==='camps' ? '' : 'none';
-  document.getElementById('dailySummaryView').style.display = tab==='daily' ? '' : 'none';
+  document.getElementById('scheduleView').style.display = tab==='schedule' ? '' : 'none';
+  document.getElementById('poolView').style.display = tab==='pool' ? '' : 'none';
   document.getElementById('staffView').style.display = tab==='staff' ? '' : 'none';
   document.getElementById('openShiftsView').style.display = tab==='openShifts' ? '' : 'none';
   document.getElementById('directorsView').style.display = tab==='directors' ? '' : 'none';
   if (tab === 'directors') loadDirectors();
   if (tab === 'openShifts') loadOpenShifts();
-  if (tab === 'daily') load();  // Always refresh data when switching to daily summary
 }
 
 async function load() {
@@ -257,7 +290,7 @@ async function load() {
   // Index confirmations by staff_id + camp
   data.confirmMap = {};
   data.confirmations.forEach(c => { data.confirmMap[`${c.staff_id}|${c.camp}`] = c; });
-  renderCamps(); renderStaff(); renderDailySummary();
+  renderSchedule(); renderPool(); renderStaff(); renderDailySummary();
 }
 
 function shiftLabel(shift, day) {
@@ -307,6 +340,197 @@ function dropdownClass(val) {
 
 function starsHtml(staffId, cur) {
   return [1,2,3,4,5].map(i => `<button class="star-btn" onclick="setRating(${staffId},${i})">${i<=cur?'★':'☆'}</button>`).join('');
+}
+
+// ── Schedule Tab (assigned staff only) ──────────────────────────────────────
+function renderSchedule() {
+  const campMap = {};
+  data.camps.forEach(row => {
+    if (row.status !== 'confirmed') return;
+    if (!campMap[row.camp]) campMap[row.camp] = {};
+    const k = row.staff_id;
+    if (!campMap[row.camp][k]) campMap[row.camp][k] = {
+      name: row.name, email: row.email, preferred_role: row.preferred_role,
+      rating: row.rating, staff_id: row.staff_id, days: {},
+      bg_check_done: row.bg_check_done,
+      schedule_confirmed_at: row.schedule_confirmed_at,
+      schedule_updated_at: row.schedule_updated_at
+    };
+    campMap[row.camp][k].days[row.day] = {
+      shift: row.shift, confirmed_shift: row.confirmed_shift,
+      req_id: row.req_id, status: row.status
+    };
+  });
+
+  const campOrder = Object.keys(campMap).length
+    ? CAMP_ORDER.filter(c => campMap[c]).concat(Object.keys(campMap).filter(c => !CAMP_ORDER.includes(c)))
+    : [];
+
+  let html = '';
+  let lastWeek = null;
+  campOrder.forEach(campName => {
+    const need = CAMP_NEEDS[campName] || {am:0, pm:0};
+    const staffArr = Object.values(campMap[campName]).sort((a,b) => a.name.localeCompare(b.name));
+    const week = campName.split('\u00b7')[0].trim();
+    if (week !== lastWeek) { html += `<div class="week-divider">${week}</div>`; lastWeek = week; }
+
+    // Count confirmed AM/PM
+    const amCount = staffArr.filter(s => { const e=effectiveShift(s); return e==='am'||e==='full'; }).length;
+    const pmCount = staffArr.filter(s => { const e=effectiveShift(s); return e==='pm'||e==='full'; }).length;
+    const amOk = amCount >= need.am, pmOk = pmCount >= need.pm;
+
+    html += `<div class="camp-section">
+      <div class="camp-hdr">
+        <h3>${campName}</h3>
+        <div style="font-size:0.8rem">
+          <span style="color:${amOk?'#1a7a3a':'#cc0000'};font-weight:700">AM ${amCount}/${need.am}</span>
+          &nbsp;&middot;&nbsp;
+          <span style="color:${pmOk?'#1a7a3a':'#cc0000'};font-weight:700">PM ${pmCount}/${need.pm}</span>
+          &nbsp;&middot;&nbsp;
+          <span style="color:#888">${staffArr.length} assigned</span>
+        </div>
+      </div>`;
+
+    if (!staffArr.length) {
+      html += `<div class="empty">No one assigned yet — check Availability Pool</div>`;
+    } else {
+      html += `<div class="table-scroll"><table class="sched">
+        <thead><tr>
+          <th class="name-col">Staff</th><th>Role</th><th>Rating</th>
+          ${DAYS.map(d=>`<th>${d}</th>`).join('')}
+          <th>BG</th><th>Response</th><th></th>
+        </tr></thead><tbody>`;
+      staffArr.forEach(s => {
+        const detailId = `sch-detail-${s.staff_id}-${campName.replace(/[^a-z0-9]/gi,'_')}`;
+        const safecamp = campName.replace(/'/g,"\\'");
+        const ca = s.schedule_confirmed_at ? new Date(s.schedule_confirmed_at) : null;
+        const ua = s.schedule_updated_at ? new Date(s.schedule_updated_at) : null;
+        let responseCell;
+        if (ca && (!ua || ca > ua)) responseCell = '<span style="color:#1a7a3a;font-weight:700">✅ Confirmed</span>';
+        else if (ua) responseCell = `<div><button onclick="toggleDetails('${detailId}')" style="background:none;border:none;cursor:pointer;padding:0"><span style="color:#e07000;font-weight:700">✏️ Updated</span><br><span style="color:#0066cc;font-size:0.68rem;text-decoration:underline">review</span></button><br><button onclick="markReviewed(${s.staff_id})" style="margin-top:3px;font-size:0.65rem;padding:2px 7px;background:#f0fff5;border:1px solid #a3e6c0;border-radius:4px;color:#1a7a3a;cursor:pointer">✔ Reviewed</button></div>`;
+        else responseCell = '<span style="color:#aaa">⧓ Awaiting</span>';
+
+        html += `<tr>
+          <td class="name-col"><strong>${s.name}</strong><br><span style="font-size:0.72rem;color:#aaa">${s.email}</span></td>
+          <td><span class="role-badge">${s.preferred_role||'?'}</span></td>
+          <td><span class="rating-stars">${'★'.repeat(s.rating)}${'☆'.repeat(5-s.rating)}</span></td>
+          ${DAYS.map(d => {
+            const day = s.days[d];
+            if (!day) return `<td>${dayBadge(null,false,d)}</td>`;
+            const effShift = day.confirmed_shift || day.shift;
+            return `<td>${dayBadge(effShift, day.status==='cancelled', d)}</td>`;
+          }).join('')}
+          <td style="text-align:center">
+            <input type="checkbox" ${s.bg_check_done?'checked':''} onchange="setBgCheck(${s.staff_id},this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:#1a7a3a">
+          </td>
+          <td>${responseCell}</td>
+          <td>
+            <button class="detail-btn" onclick="toggleDetails('${detailId}')">Details</button>
+            <button class="detail-btn" style="color:#cc0000;margin-top:3px" onclick="openAdjustDays(${s.staff_id},'${safecamp}')">Adjust</button>
+          </td>
+        </tr>
+        <tr id="${detailId}" class="detail-row" style="display:none">
+          <td colspan="${DAYS.length+6}">
+            <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+              ${DAYS.map(d => {
+                const day = s.days[d]; if (!day) return '';
+                const selCS = day.status==='confirmed' ? (day.confirmed_shift||day.shift) : '';
+                return `<tr><td style="width:50px;font-weight:700">${d}</td>
+                  <td><select style="padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:0.75rem" onchange="setDaySchedule(${day.req_id},this.value)">
+                    <option value="" ${selCS===''?'selected':''}>— None</option>
+                    <option value="am" ${selCS==='am'?'selected':''}>AM</option>
+                    <option value="pm" ${selCS==='pm'?'selected':''}>PM</option>
+                    <option value="full" ${selCS==='full'?'selected':''}>Full Day</option>
+                  </select></td></tr>`;
+              }).join('')}
+            </table>
+          </td>
+        </tr>`;
+      });
+      html += `</tbody></table></div>`;
+    }
+    html += `</div>`;
+  });
+  document.getElementById('scheduleView').innerHTML = html || '<div class="empty">No assignments yet this season.</div>';
+}
+
+// ── Availability Pool Tab (unassigned / pending) ─────────────────────────────
+function renderPool() {
+  const poolMap = {};
+  // Include staff who have ANY pending row for a camp (even if some days confirmed)
+  data.camps.forEach(row => {
+    if (row.status !== 'pending') return;
+    if (!poolMap[row.camp]) poolMap[row.camp] = {};
+    const k = row.staff_id;
+    if (!poolMap[row.camp][k]) poolMap[row.camp][k] = {
+      name: row.name, email: row.email, preferred_role: row.preferred_role,
+      rating: row.rating, staff_id: row.staff_id, days: {}
+    };
+    poolMap[row.camp][k].days[row.day] = { shift: row.shift, req_id: row.req_id };
+  });
+
+  const campOrder = CAMP_ORDER.filter(c => poolMap[c])
+    .concat(Object.keys(poolMap).filter(c => !CAMP_ORDER.includes(c)));
+
+  let html = '';
+  let lastWeek = null;
+  campOrder.forEach(campName => {
+    const staffArr = Object.values(poolMap[campName]).sort((a,b) => b.rating - a.rating || a.name.localeCompare(b.name));
+    const week = campName.split('\u00b7')[0].trim();
+    if (week !== lastWeek) { html += `<div class="week-divider">${week}</div>`; lastWeek = week; }
+    html += `<div class="camp-section">
+      <div class="camp-hdr"><h3>${campName}</h3><span class="staff-count">${staffArr.length} available</span></div>
+      <div class="table-scroll"><table class="sched">
+        <thead><tr>
+          <th class="name-col">Staff</th><th>Role</th><th>Rating</th>
+          ${DAYS.map(d=>`<th>${d}</th>`).join('')}
+          <th>Assign</th>
+        </tr></thead><tbody>`;
+    staffArr.forEach(s => {
+      const safecamp = campName.replace(/'/g,"\\'");
+      html += `<tr>
+        <td class="name-col"><strong>${s.name}</strong><br><span style="font-size:0.72rem;color:#aaa">${s.email}</span></td>
+        <td><span class="role-badge">${s.preferred_role||'?'}</span></td>
+        <td><span class="rating-stars">${'★'.repeat(s.rating)}${'☆'.repeat(5-s.rating)}</span></td>
+        ${DAYS.map(d => {
+          const day = s.days[d];
+          if (!day) return `<td>${dayBadge(null,false,d)}</td>`;
+          return `<td>${dayBadge(day.shift, false, d)}</td>`;
+        }).join('')}
+        <td>
+          <button onclick="openAssignModal(${s.staff_id},'${safecamp}','${s.name.replace(/'/g,"\\'")}')"
+            style="background:#111;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer">Assign</button>
+        </td>
+      </tr>`;
+    });
+    html += `</tbody></table></div></div>`;
+  });
+  document.getElementById('poolView').innerHTML = html || '<div class="empty">No pending availability submissions.</div>';
+}
+
+// Assign modal
+function openAssignModal(staffId, camp, name) {
+  document.getElementById('assignModalTitle').textContent = `Assign ${name}`;
+  document.getElementById('assignModalDesc').textContent = camp;
+  const btns = document.getElementById('assignModalBtns');
+  btns.innerHTML = [
+    ['Assign — Full Week', 'confirmed', '#1a7a3a'],
+    ['Assign — AM Only', 'confirmed_am', '#0066cc'],
+    ['Assign — PM Only', 'confirmed_pm', '#8844cc'],
+  ].map(([label, status, color]) =>
+    `<button onclick="doAssign(${staffId},'${camp.replace(/'/g,"\\'")}',' ${status}')" style="padding:11px;border:none;border-radius:6px;font-size:0.9rem;font-weight:700;cursor:pointer;background:${color};color:#fff">${label}</button>`
+  ).join('');
+  document.getElementById('assignModal').style.display = 'flex';
+}
+function closeAssignModal() { document.getElementById('assignModal').style.display = 'none'; }
+async function doAssign(staffId, camp, status) {
+  closeAssignModal();
+  await fetch('/api/admin/status', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ staff_id: staffId, camp, status: status.trim() })
+  });
+  load();
+  switchTab('schedule');
 }
 
 function renderCamps() {
