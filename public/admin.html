@@ -441,7 +441,8 @@ function renderCamps() {
         html += `<tr>
           <td class="name-col">
             <strong>${s.name}</strong><br>
-            <span style="font-size:0.73rem;color:#aaa">${s.email}</span>
+            <span style="font-size:0.73rem;color:#aaa">${s.email}</span><br>
+            <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:${s.overallStatus==='confirmed'?'#1a7a3a':'#aaa'}">${s.overallStatus==='confirmed'?'Assigned':'Available:'}</span>
           </td>
           <td><span class="role-badge">${s.preferred_role || '?'}</span></td>
           <td><span class="rating-stars">${'★'.repeat(s.rating)}${'☆'.repeat(5-s.rating)}</span></td>
