@@ -103,13 +103,14 @@
 
 <!-- Assign modal -->
 <div id="assignModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:12px;padding:24px;margin:20px;max-width:380px;width:100%">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+  <div style="background:#fff;border-radius:12px;padding:24px;margin:20px;max-width:440px;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <h3 style="font-size:1rem" id="assignModalTitle">Assign Staff</h3>
       <button onclick="closeAssignModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#aaa">&times;</button>
     </div>
     <p style="font-size:0.82rem;color:#666;margin-bottom:16px" id="assignModalDesc"></p>
-    <div style="display:flex;flex-direction:column;gap:8px" id="assignModalBtns"></div>
+    <div id="assignModalDays"></div>
+    <button id="assignModalSaveBtn" onclick="doAssignDays()" style="margin-top:16px;width:100%;padding:11px;background:#1a7a3a;color:#fff;border:none;border-radius:6px;font-size:0.9rem;font-weight:700;cursor:pointer">Save Assignment</button>
   </div>
 </div>
 
@@ -489,6 +490,11 @@ function renderPool() {
     };
     poolMap[row.camp][k].days[row.day] = { shift: row.shift, req_id: row.req_id };
   });
+  // Populate global lookup for the assign modal
+  Object.keys(poolMap).forEach(camp => {
+    _poolDays[camp] = {};
+    Object.values(poolMap[camp]).forEach(s => { _poolDays[camp][s.staff_id] = s.days; });
+  });
 
   const campOrder = CAMP_ORDER.filter(c => poolMap[c])
     .concat(Object.keys(poolMap).filter(c => !CAMP_ORDER.includes(c)));
@@ -529,29 +535,67 @@ function renderPool() {
   document.getElementById('poolView').innerHTML = html || '<div class="empty">No pending availability submissions.</div>';
 }
 
+// Pool days lookup — populated in renderPool
+const _poolDays = {};
+
 // Assign modal
+let _assignState = { staffId: null, camp: null };
 function openAssignModal(staffId, camp, name) {
+  const days = (_poolDays[camp] && _poolDays[camp][staffId]) || {};
+  _assignState = { staffId, camp };
   document.getElementById('assignModalTitle').textContent = `Assign ${name}`;
   document.getElementById('assignModalDesc').textContent = camp;
-  const btns = document.getElementById('assignModalBtns');
-  btns.innerHTML = [
-    ['Assign — Full Week', 'confirmed', '#1a7a3a'],
-    ['Assign — AM Only', 'confirmed_am', '#0066cc'],
-    ['Assign — PM Only', 'confirmed_pm', '#8844cc'],
-  ].map(([label, status, color]) =>
-    `<button onclick="doAssign(${staffId},'${camp.replace(/'/g,"\\'")}',' ${status}')" style="padding:11px;border:none;border-radius:6px;font-size:0.9rem;font-weight:700;cursor:pointer;background:${color};color:#fff">${label}</button>`
-  ).join('');
+  const shiftOpts = [
+    ['', '— None'],
+    ['am', 'AM (8am–12pm)'],
+    ['pm', 'PM (12pm–4pm)'],
+    ['full', 'Full Day (8:20am–3:20pm)'],
+  ];
+  const rows = DAYS.map(d => {
+    const day = days[d];
+    if (!day) return '';
+    const avail = day.shift || '';
+    // Pre-select based on stated availability
+    const presel = avail; // mirror what they said they can do
+    const opts = shiftOpts.map(([v, label]) =>
+      `<option value="${v}" ${v === presel ? 'selected' : ''}>${label}</option>`
+    ).join('');
+    return `<tr>
+      <td style="width:48px;font-weight:700;font-size:0.85rem">${d}</td>
+      <td><select data-reqid="${day.req_id}" data-day="${d}" style="padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;width:100%">${opts}</select></td>
+    </tr>`;
+  }).filter(Boolean).join('');
+  document.getElementById('assignModalDays').innerHTML =
+    `<table style="width:100%;border-collapse:collapse;">${rows}</table>`;
   document.getElementById('assignModal').style.display = 'flex';
 }
 function closeAssignModal() { document.getElementById('assignModal').style.display = 'none'; }
-async function doAssign(staffId, camp, status) {
-  closeAssignModal();
-  await fetch('/api/admin/status', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ staff_id: staffId, camp, status: status.trim() })
+async function doAssignDays() {
+  const btn = document.getElementById('assignModalSaveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const { staffId, camp } = _assignState;
+  const selects = document.getElementById('assignModalDays').querySelectorAll('select[data-reqid]');
+  const updates = [];
+  selects.forEach(sel => {
+    updates.push({ req_id: parseInt(sel.dataset.reqid), day: sel.dataset.day,
+      status: sel.value ? 'confirmed' : 'declined', confirmed_shift: sel.value || null });
   });
-  load();
-  switchTab('schedule');
+  if (!updates.length) { btn.disabled = false; btn.textContent = 'Save Assignment'; return; }
+  const r = await fetch('/api/admin/batch-update-days', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ updates, staff_id: staffId, camp, notify: true })
+  });
+  if (r.ok) {
+    closeAssignModal();
+    btn.disabled = false; btn.textContent = 'Save Assignment';
+    const cr = await fetch('/api/admin/camps');
+    data.camps = await cr.json();
+    renderSchedule(); renderPool();
+    switchTab('schedule');
+  } else {
+    btn.disabled = false; btn.textContent = 'Save Assignment';
+    alert('Error saving assignment.');
+  }
 }
 
 function renderCamps() {
