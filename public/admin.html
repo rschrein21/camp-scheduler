@@ -1132,7 +1132,7 @@ async function saveChanges(detailId, staffId, camp) {
     const reqId  = parseInt(sel.dataset.reqid);
     const day    = sel.dataset.day;
     const value  = sel.value;
-    updates.push({ req_id: reqId, day, status: value ? 'confirmed' : 'declined', confirmed_shift: value || null });
+    updates.push({ req_id: reqId, day, status: value ? 'confirmed' : 'pending', confirmed_shift: value || null });
   });
   if (!updates.length) {
     if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }

@@ -301,6 +301,17 @@ if (IS_PG) {
       WHERE sc.staff_id = s.id
       AND s.schedule_confirmed_at IS NULL
     `);
+    // One-time fix (2026-06-20): reset declined rows back to pending so partially-assigned staff
+    // re-appear in the availability pool for unassigned days.
+    // Only resets rows where cancel_requested is false and cancel_reason is null
+    // (i.e. not intentionally cancelled by admin or staff).
+    await pool.query(`
+      UPDATE requests
+      SET status = 'pending', confirmed_shift = NULL
+      WHERE status = 'declined'
+        AND (cancel_requested IS NULL OR cancel_requested = FALSE)
+        AND (cancel_reason IS NULL OR cancel_reason = '')
+    `);
     // Allow multiple directors per camp per role — drop camp+role unique, enforce director+camp unique
     await pool.query(`ALTER TABLE director_assignments DROP CONSTRAINT IF EXISTS director_assignments_camp_role_key`);
     await pool.query(`
