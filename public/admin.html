@@ -577,8 +577,9 @@ async function doAssignDays() {
   const selects = document.getElementById('assignModalDays').querySelectorAll('select[data-reqid]');
   const updates = [];
   selects.forEach(sel => {
+    if (!sel.value) return; // leave unselected days as pending — they stay in the pool
     updates.push({ req_id: parseInt(sel.dataset.reqid), day: sel.dataset.day,
-      status: sel.value ? 'confirmed' : 'declined', confirmed_shift: sel.value || null });
+      status: 'confirmed', confirmed_shift: sel.value });
   });
   if (!updates.length) { btn.disabled = false; btn.textContent = 'Save Assignment'; return; }
   const r = await fetch('/api/admin/batch-update-days', {
