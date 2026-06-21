@@ -490,6 +490,17 @@ function renderPool() {
     };
     poolMap[row.camp][k].days[row.day] = { shift: row.shift, req_id: row.req_id };
   });
+
+  // Build set of staff already confirmed at any camp, keyed by "staffId:week"
+  // A staff member confirmed at one location should be hidden from the pool for other locations that week
+  const confirmedAtWeek = new Set();
+  data.camps.forEach(row => {
+    if (row.status === 'confirmed') {
+      const week = row.camp.split('\u00b7')[0].trim();
+      confirmedAtWeek.add(`${row.staff_id}:${week}`);
+    }
+  });
+
   // Populate global lookup for the assign modal
   Object.keys(poolMap).forEach(camp => {
     _poolDays[camp] = {};
@@ -502,8 +513,11 @@ function renderPool() {
   let html = '';
   let lastWeek = null;
   campOrder.forEach(campName => {
-    const staffArr = Object.values(poolMap[campName]).sort((a,b) => b.rating - a.rating || a.name.localeCompare(b.name));
     const week = campName.split('\u00b7')[0].trim();
+    // Filter out staff already confirmed at another location during the same week
+    const staffArr = Object.values(poolMap[campName])
+      .filter(s => !confirmedAtWeek.has(`${s.staff_id}:${week}`))
+      .sort((a,b) => b.rating - a.rating || a.name.localeCompare(b.name));
     if (week !== lastWeek) { html += `<div class="week-divider">${week}</div>`; lastWeek = week; }
     html += `<div class="camp-section">
       <div class="camp-hdr"><h3>${campName}</h3><span class="staff-count">${staffArr.length} available</span></div>
