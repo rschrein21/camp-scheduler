@@ -491,13 +491,16 @@ function renderPool() {
     poolMap[row.camp][k].days[row.day] = { shift: row.shift, req_id: row.req_id };
   });
 
-  // Build set of staff already confirmed at any camp, keyed by "staffId:week"
-  // A staff member confirmed at one location should be hidden from the pool for other locations that week
-  const confirmedAtWeek = new Set();
+  // Build map of confirmed camps per staff per week, keyed by "staffId:week" -> Set of camp names
+  // Used to hide staff from the pool only when confirmed at a DIFFERENT location that week.
+  // If they're confirmed at THIS camp (partial assign), they keep pending days and stay in the pool.
+  const confirmedCampsForStaff = {};
   data.camps.forEach(row => {
     if (row.status === 'confirmed') {
       const week = row.camp.split('\u00b7')[0].trim();
-      confirmedAtWeek.add(`${row.staff_id}:${week}`);
+      const key = `${row.staff_id}:${week}`;
+      if (!confirmedCampsForStaff[key]) confirmedCampsForStaff[key] = new Set();
+      confirmedCampsForStaff[key].add(row.camp);
     }
   });
 
@@ -516,7 +519,13 @@ function renderPool() {
     const week = campName.split('\u00b7')[0].trim();
     // Filter out staff already confirmed at another location during the same week
     const staffArr = Object.values(poolMap[campName])
-      .filter(s => !confirmedAtWeek.has(`${s.staff_id}:${week}`))
+      .filter(s => {
+        const key = `${s.staff_id}:${week}`;
+        const confirmedCamps = confirmedCampsForStaff[key];
+        if (!confirmedCamps) return true; // not confirmed anywhere this week
+        if (confirmedCamps.has(campName)) return true; // partial assign at this same camp — keep in pool
+        return false; // confirmed only at a different camp this week — hide
+      })
       .sort((a,b) => b.rating - a.rating || a.name.localeCompare(b.name));
     if (week !== lastWeek) { html += `<div class="week-divider">${week}</div>`; lastWeek = week; }
     html += `<div class="camp-section">
