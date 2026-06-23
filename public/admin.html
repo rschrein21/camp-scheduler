@@ -528,12 +528,38 @@ function renderPool() {
       })
       .sort((a,b) => b.rating - a.rating || a.name.localeCompare(b.name));
     if (week !== lastWeek) { html += `<div class="week-divider">${week}</div>`; lastWeek = week; }
+
+    // Remaining daily need: total_needed - confirmed - pending_in_pool
+    const need = CAMP_NEEDS[campName] || {am:0, pm:0};
+    const confDay = {}; DAYS.forEach(d => { confDay[d] = {am:0, pm:0}; });
+    data.camps.forEach(row => {
+      if (row.camp !== campName || row.status !== 'confirmed') return;
+      const eff = row.confirmed_shift || row.shift;
+      if (eff === 'am'   || eff === 'full') confDay[row.day].am++;
+      if (eff === 'pm'   || eff === 'full') confDay[row.day].pm++;
+    });
+    const pendDay = {}; DAYS.forEach(d => { pendDay[d] = {am:0, pm:0}; });
+    staffArr.forEach(s => {
+      DAYS.forEach(d => {
+        const day = s.days[d]; if (!day) return;
+        if (day.shift === 'am'  || day.shift === 'full') pendDay[d].am++;
+        if (day.shift === 'pm'  || day.shift === 'full') pendDay[d].pm++;
+      });
+    });
+
     html += `<div class="camp-section">
       <div class="camp-hdr"><h3>${campName}</h3><span class="staff-count">${staffArr.length} available</span></div>
       <div class="table-scroll"><table class="sched">
         <thead><tr>
           <th class="name-col">Staff</th><th>Role</th><th>Rating</th>
-          ${DAYS.map(d=>`<th>${d}</th>`).join('')}
+          ${DAYS.map(d => {
+            const remAM = Math.max(0, need.am - confDay[d].am - pendDay[d].am);
+            const remPM = Math.max(0, need.pm - confDay[d].pm - pendDay[d].pm);
+            const sub = (need.am > 0 || need.pm > 0)
+              ? `<span style="color:#0066cc">AM:${remAM}</span> <span style="color:#8844cc">PM:${remPM}</span>`
+              : '<span style="color:#ccc">—</span>';
+            return `<th>${d}<div style="font-size:0.68rem;font-weight:500;margin-top:2px;white-space:nowrap">${sub}</div></th>`;
+          }).join('')}
           <th>Assign</th>
         </tr></thead><tbody>`;
     staffArr.forEach(s => {
