@@ -303,15 +303,20 @@ if (IS_PG) {
     `);
     // One-time fix (2026-06-20): reset declined rows back to pending so partially-assigned staff
     // re-appear in the availability pool for unassigned days.
-    // Only resets rows where cancel_requested is false and cancel_reason is null
-    // (i.e. not intentionally cancelled by admin or staff).
-    await pool.query(`
-      UPDATE requests
-      SET status = 'pending', confirmed_shift = NULL
-      WHERE status = 'declined'
-        AND (cancel_requested IS NULL OR cancel_requested = FALSE)
-        AND (cancel_reason IS NULL OR cancel_reason = '')
-    `);
+    // Uses a migration_flags table to ensure this runs exactly once, not on every server restart.
+    await pool.query(`CREATE TABLE IF NOT EXISTS migration_flags (key TEXT PRIMARY KEY, applied_at TIMESTAMP DEFAULT NOW())`);
+    const mfRows = await pool.query(`SELECT 1 FROM migration_flags WHERE key = 'reset_declined_to_pending_2026_06_20'`);
+    if (mfRows.rows.length === 0) {
+      await pool.query(`
+        UPDATE requests
+        SET status = 'pending', confirmed_shift = NULL
+        WHERE status = 'declined'
+          AND (cancel_requested IS NULL OR cancel_requested = FALSE)
+          AND (cancel_reason IS NULL OR cancel_reason = '')
+      `);
+      await pool.query(`INSERT INTO migration_flags (key) VALUES ('reset_declined_to_pending_2026_06_20')`);
+      console.log('Applied one-time migration: reset_declined_to_pending_2026_06_20');
+    }
     // Allow multiple directors per camp per role — drop camp+role unique, enforce director+camp unique
     await pool.query(`ALTER TABLE director_assignments DROP CONSTRAINT IF EXISTS director_assignments_camp_role_key`);
     await pool.query(`
