@@ -1,12 +1,12 @@
 {
-  "updated": "2026-06-22T10:00:56Z",
+  "updated": "2026-06-23T10:00:53Z",
   "camps": {
     "July 6\u201310 \u00b7 Lower Woodland": {
       "am": 7,
       "pm": 7,
-      "fullDay": 65,
+      "fullDay": 64,
       "halfDay": 5,
-      "total": 70
+      "total": 69
     },
     "Aug 10\u201314 \u00b7 Lower Woodland": {
       "am": 7,
@@ -25,16 +25,16 @@
     "June 22\u201326 \u00b7 Seattle University": {
       "am": 8,
       "pm": 7,
-      "fullDay": 63,
+      "fullDay": 64,
       "halfDay": 9,
-      "total": 72
+      "total": 73
     },
     "July 6\u201310 \u00b7 Seattle University": {
       "am": 4,
       "pm": 3,
-      "fullDay": 29,
+      "fullDay": 30,
       "halfDay": 4,
-      "total": 33
+      "total": 34
     },
     "July 13\u201317 \u00b7 Seattle University": {
       "am": 6,
@@ -46,9 +46,9 @@
     "July 20\u201324 \u00b7 Seattle University": {
       "am": 6,
       "pm": 5,
-      "fullDay": 46,
+      "fullDay": 45,
       "halfDay": 7,
-      "total": 53
+      "total": 52
     },
     "Aug 3\u20137 \u00b7 Washington Park": {
       "am": 9,
@@ -60,9 +60,9 @@
     "July 20\u201324 \u00b7 Bothell": {
       "am": 5,
       "pm": 4,
-      "fullDay": 38,
+      "fullDay": 39,
       "halfDay": 8,
-      "total": 46
+      "total": 47
     },
     "July 13\u201317 \u00b7 Issaquah": {
       "am": 5,
@@ -102,23 +102,23 @@
     "June 22\u201326 \u00b7 West Seattle Del Ridge": {
       "am": 11,
       "pm": 9,
-      "fullDay": 88,
-      "halfDay": 18,
+      "fullDay": 89,
+      "halfDay": 17,
       "total": 106
     },
     "July 13\u201317 \u00b7 West Seattle Hiawatha": {
       "am": 10,
       "pm": 9,
       "fullDay": 82,
-      "halfDay": 12,
-      "total": 94
+      "halfDay": 10,
+      "total": 92
     },
     "Aug 17\u201321 \u00b7 West Seattle Del Ridge": {
       "am": 10,
       "pm": 8,
       "fullDay": 76,
-      "halfDay": 19,
-      "total": 95
+      "halfDay": 20,
+      "total": 96
     },
     "July 20\u201324 \u00b7 West Seattle Del Ridge": {
       "am": 3,
