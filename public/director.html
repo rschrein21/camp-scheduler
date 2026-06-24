@@ -78,6 +78,12 @@
   .rating-note { font-size: 0.78rem; color: #888; }
   .tab-note { background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 10px 14px;
     font-size: 0.82rem; color: #7a6000; margin-bottom: 14px; }
+  .star-legend { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 10px 14px;
+    font-size: 0.78rem; color: #444; margin-bottom: 14px; }
+  .star-legend strong { display: block; margin-bottom: 6px; font-size: 0.82rem; color: #222; }
+  .star-legend-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 3px; }
+  .star-legend-stars { color: #f0a500; min-width: 60px; letter-spacing: 1px; }
+  .star-legend-label { color: #555; }
 </style>
 </head>
 <body>
@@ -387,7 +393,15 @@ function renderRatings() {
     return;
   }
 
-  let html = '<div class="tab-note">⭐ Rate staff who worked for you this week (1–5 stars)</div>';
+  let html = `<div class="tab-note">⭐ Rate staff who worked for you. Use the guide below, then hit Save.</div>
+  <div class="star-legend">
+    <strong>Rating Guide</strong>
+    <div class="star-legend-row"><span class="star-legend-stars">★☆☆☆☆</span><span class="star-legend-label">Would not hire again</span></div>
+    <div class="star-legend-row"><span class="star-legend-stars">★★☆☆☆</span><span class="star-legend-label">Would only hire again if short-staffed</span></div>
+    <div class="star-legend-row"><span class="star-legend-stars">★★★☆☆</span><span class="star-legend-label">Did the job</span></div>
+    <div class="star-legend-row"><span class="star-legend-stars">★★★★☆</span><span class="star-legend-label">Did well — hire again</span></div>
+    <div class="star-legend-row"><span class="star-legend-stars">★★★★★</span><span class="star-legend-label">Hire again any week they can work</span></div>
+  </div>`;
   let lastWeek = null;
   camps.forEach(campName => {
     const week = weekOf(campName);

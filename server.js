@@ -317,6 +317,74 @@ if (IS_PG) {
       await pool.query(`INSERT INTO migration_flags (key) VALUES ('reset_declined_to_pending_2026_06_20')`);
       console.log('Applied one-time migration: reset_declined_to_pending_2026_06_20');
     }
+    // One-time: confirm all staff who actually worked June 15–19 · Seattle University
+    const june1519Flag = await pool.query(`SELECT 1 FROM migration_flags WHERE key = 'confirm_june1519_su_staff_2026_06_24'`);
+    if (june1519Flag.rows.length === 0) {
+      const camp = 'June 15\u201319 \u00b7 Seattle University';
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+      const june1519Staff = [
+        { name: 'Cesar Batres',        email: 'cesarbatres1221@gmail.com' },
+        { name: 'Sophie Hanson',        email: 'shanson1@seattleu.edu' },
+        { name: 'Peyton Harvey',        email: 'peytonharvey6@gmail.com' },
+        { name: 'Corbin Honey',         email: 'corbin.honey@gmail.com' },
+        { name: 'Aleksander Kapciak',   email: 'akapciak07@gmail.com' },
+        { name: 'Alana Lamb',           email: 'alamb1@seattleu.edu' },
+        { name: 'Alex Notzka',          email: 'alexnotzka18@gmail.com' },
+        { name: 'Owen Purvis',          email: 'owenjpurvis@icloud.com' },
+        { name: 'Rachael Remnet',       email: 'remnetrachael@gmail.com' },
+        { name: 'Savannah Singleton',   email: 'singletonsavannah1@gmail.com' },
+        { name: 'Bowen Teuber',         email: 'bteuber@seattleu.edu' },
+        { name: 'Kaehukai Ui Kaaihue',  email: 'kkaaihue@seattleu.edu' },
+        { name: 'Emery Weaver',         email: 'emweave@icloud.com' },
+        { name: 'Myah Polzin',          email: 'myahpolzin@gmail.com' },
+      ];
+      for (const s of june1519Staff) {
+        // Ensure staff row exists
+        const existing = await pool.query(`SELECT id FROM staff WHERE LOWER(email) = LOWER($1)`, [s.email]);
+        let staffId;
+        if (existing.rows.length) {
+          staffId = existing.rows[0].id;
+        } else {
+          const ins = await pool.query(
+            `INSERT INTO staff (name, email) VALUES ($1, $2) RETURNING id`,
+            [s.name, s.email]
+          );
+          staffId = ins.rows[0].id;
+        }
+        // Ensure confirmed request exists for each day
+        for (const day of days) {
+          const req = await pool.query(
+            `SELECT id FROM requests WHERE staff_id = $1 AND camp = $2 AND day = $3`,
+            [staffId, camp, day]
+          );
+          if (req.rows.length) {
+            await pool.query(
+              `UPDATE requests SET status = 'confirmed', confirmed_shift = 'full' WHERE id = $1`,
+              [req.rows[0].id]
+            );
+          } else {
+            await pool.query(
+              `INSERT INTO requests (staff_id, camp, day, shift, status, confirmed_shift) VALUES ($1, $2, $3, 'full', 'confirmed', 'full')`,
+              [staffId, camp, day]
+            );
+          }
+        }
+        // Ensure director assignments for SU June 15–19 directors
+        const suDirectorEmails = ['jeff.seattlesoccer@gmail.com', 'myahpolzin@gmail.com', 'jfarrell2@seattleu.edu'];
+        for (const dEmail of suDirectorEmails) {
+          const dRow = await pool.query(`SELECT id FROM directors WHERE LOWER(email) = LOWER($1)`, [dEmail]);
+          if (dRow.rows.length) {
+            await pool.query(
+              `INSERT INTO director_assignments (director_id, camp) VALUES ($1, $2) ON CONFLICT (director_id, camp) DO NOTHING`,
+              [dRow.rows[0].id, camp]
+            );
+          }
+        }
+      }
+      await pool.query(`INSERT INTO migration_flags (key) VALUES ('confirm_june1519_su_staff_2026_06_24')`);
+      console.log('Applied migration: confirm_june1519_su_staff_2026_06_24 — 14 June 15–19 SU staff confirmed');
+    }
+
     // Allow multiple directors per camp per role — drop camp+role unique, enforce director+camp unique
     await pool.query(`ALTER TABLE director_assignments DROP CONSTRAINT IF EXISTS director_assignments_camp_role_key`);
     await pool.query(`
