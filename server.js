@@ -369,18 +369,38 @@ if (IS_PG) {
             );
           }
         }
-        // Ensure director assignments for SU June 15–19 directors
-        const suDirectorEmails = ['jeff.seattlesoccer@gmail.com', 'myahpolzin@gmail.com', 'jfarrell2@seattleu.edu'];
-        for (const dEmail of suDirectorEmails) {
-          const dRow = await pool.query(`SELECT id FROM directors WHERE LOWER(email) = LOWER($1)`, [dEmail]);
-          if (dRow.rows.length) {
-            await pool.query(
-              `INSERT INTO director_assignments (director_id, camp) VALUES ($1, $2) ON CONFLICT (director_id, camp) DO NOTHING`,
-              [dRow.rows[0].id, camp]
-            );
-          }
+      } // end june1519Staff loop
+
+      // Ensure June 15–19 SU director accounts exist (Jeff, Myah, Ian) and are assigned
+      const suDirectors = [
+        { name: 'Jeff Hinkle',  email: 'jeff.seattlesoccer@gmail.com', phone: '3306075693' },
+        { name: 'Myah Polzin',  email: 'myahpolzin@gmail.com',         phone: '5105930736' },
+        // Ian Hartford phone TBD — add when available
+      ];
+      for (const d of suDirectors) {
+        // Find by phone or email; create if missing
+        let dRow = await pool.query(
+          `SELECT id FROM directors WHERE regexp_replace(phone, '[^0-9]', '', 'g') = $1 OR LOWER(email) = LOWER($2)`,
+          [d.phone, d.email]
+        );
+        let dirId;
+        if (dRow.rows.length) {
+          dirId = dRow.rows[0].id;
+          await pool.query(`UPDATE directors SET phone = $1, email = $2 WHERE id = $3`, [d.phone, d.email, dirId]);
+        } else {
+          const ins = await pool.query(
+            `INSERT INTO directors (name, email, phone) VALUES ($1, $2, $3) RETURNING id`,
+            [d.name, d.email, d.phone]
+          );
+          dirId = ins.rows[0].id;
         }
+        await pool.query(
+          `INSERT INTO director_assignments (director_id, camp) VALUES ($1, $2) ON CONFLICT (director_id, camp) DO NOTHING`,
+          [dirId, camp]
+        );
       }
+      // Note: Ian Hartford will be added in a separate migration once his phone is confirmed
+
       await pool.query(`INSERT INTO migration_flags (key) VALUES ('confirm_june1519_su_staff_2026_06_24')`);
       console.log('Applied migration: confirm_june1519_su_staff_2026_06_24 — 14 June 15–19 SU staff confirmed');
     }
@@ -863,10 +883,14 @@ function requireAdmin(req, res, next) { req.session.admin ? next() : res.status(
 // ── Director Auth ─────────────────────────────────────────
 app.post('/api/director/login', async (req, res) => {
   try {
-    const { name, password } = req.body;
+    const { phone, password } = req.body;
     if (password !== DIRECTOR_PASSWORD) return res.status(401).json({ error: 'Wrong password' });
-    const rows = await query('SELECT * FROM directors WHERE LOWER(name) = LOWER($1)', [name || '']);
-    if (!rows.length) return res.status(404).json({ error: 'Director not found. Ask admin to add you.' });
+    const digits = (phone || '').replace(/\D/g, '').slice(-10);
+    if (!digits) return res.status(400).json({ error: 'Please enter your phone number' });
+    const rows = IS_PG
+      ? await query(`SELECT * FROM directors WHERE regexp_replace(phone, '[^0-9]', '', 'g') = $1`, [digits])
+      : await query(`SELECT * FROM directors WHERE replace(replace(replace(replace(replace(phone,'-',''),'(',''),')',''),' ',''),'+1','') = ?`, [digits]);
+    if (!rows.length) return res.status(404).json({ error: 'Phone number not found. Contact Rich to be added.' });
     const dir = rows[0];
     req.session.director = true;
     req.session.directorId = dir.id;

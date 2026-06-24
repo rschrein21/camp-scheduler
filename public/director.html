@@ -92,12 +92,12 @@
   <div class="login-card">
     <h2>⚽ Director View</h2>
     <p>Nike Soccer Camp — Staff Schedule</p>
-    <label>Your Name</label>
-    <input type="text" id="dirName" placeholder="Enter your name" onkeydown="if(event.key==='Enter')login()">
+    <label>Your Phone Number</label>
+    <input type="tel" id="dirPhone" placeholder="e.g. 206-555-1234" onkeydown="if(event.key==='Enter')login()">
     <label>Password</label>
     <input type="password" id="pw" placeholder="Password" onkeydown="if(event.key==='Enter')login()">
     <button class="login-btn" onclick="login()">Log In</button>
-    <div class="error-msg" id="loginErr">Wrong password or name not found</div>
+    <div class="error-msg" id="loginErr">Wrong password or phone not found</div>
   </div>
 </div>
 
@@ -150,20 +150,20 @@ let ratingsData = {};  // keyed by staff_id+camp
 let currentTab = 'roster';
 
 async function login() {
-  const name = document.getElementById('dirName').value.trim();
+  const phone = document.getElementById('dirPhone').value.trim();
   const pw = document.getElementById('pw').value;
   const errEl = document.getElementById('loginErr');
   errEl.style.display = 'none';
 
   const r = await fetch('/api/director/login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, password: pw })
+    body: JSON.stringify({ phone, password: pw })
   });
   const data = await r.json();
   if (r.ok) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
-    document.getElementById('dirLabel').textContent = data.director?.name || name;
+    document.getElementById('dirLabel').textContent = data.director?.name || '';
     load();
   } else {
     errEl.textContent = data.error || 'Login failed';
