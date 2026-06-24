@@ -325,7 +325,6 @@ if (IS_PG) {
       const june1519Staff = [
         { name: 'Cesar Batres',        email: 'cesarbatres1221@gmail.com' },
         { name: 'Sophie Hanson',        email: 'shanson1@seattleu.edu' },
-        { name: 'Peyton Harvey',        email: 'peytonharvey6@gmail.com' },
         { name: 'Corbin Honey',         email: 'corbin.honey@gmail.com' },
         { name: 'Aleksander Kapciak',   email: 'akapciak07@gmail.com' },
         { name: 'Alana Lamb',           email: 'alamb1@seattleu.edu' },
@@ -338,6 +337,7 @@ if (IS_PG) {
         { name: 'Emery Weaver',         email: 'emweave@icloud.com' },
         { name: 'Myah Polzin',          email: 'myahpolzin@gmail.com' },
       ];
+      // Note: Peyton Harvey is excluded — she was a director that week, not a rateable coach
       for (const s of june1519Staff) {
         // Ensure staff row exists
         const existing = await pool.query(`SELECT id FROM staff WHERE LOWER(email) = LOWER($1)`, [s.email]);
@@ -375,7 +375,7 @@ if (IS_PG) {
       const suDirectors = [
         { name: 'Jeff Hinkle',  email: 'jeff.seattlesoccer@gmail.com', phone: '3306075693' },
         { name: 'Myah Polzin',  email: 'myahpolzin@gmail.com',         phone: '5105930736' },
-        // Ian Hartford phone TBD — add when available
+        { name: 'Ian Hartford',  email: 'ianhartford2017@gmail.com',    phone: '3106993436' },
       ];
       for (const d of suDirectors) {
         // Find by phone or email; create if missing
@@ -1053,6 +1053,44 @@ app.get('/api/director/ratings', requireDirector, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// GET /api/admin/director-ratings — aggregated anonymous director ratings
+app.get('/api/admin/director-ratings', requireAdmin, async (req, res) => {
+  try {
+    let rows;
+    if (IS_PG) {
+      rows = await query(`
+        SELECT
+          wr.staff_id, s.name, wr.camp,
+          ROUND(AVG(wr.rating)::numeric, 1)::float AS avg_rating,
+          COUNT(wr.id)::int AS rating_count,
+          ARRAY_REMOVE(ARRAY_AGG(
+            CASE WHEN wr.notes IS NOT NULL AND TRIM(wr.notes) <> '' THEN wr.notes ELSE NULL END
+            ORDER BY wr.id
+          ), NULL) AS notes_list
+        FROM weekly_ratings wr
+        JOIN staff s ON wr.staff_id = s.id
+        GROUP BY wr.staff_id, s.name, wr.camp
+        ORDER BY wr.camp, s.name
+      `);
+    } else {
+      const raw = await query('SELECT wr.staff_id, s.name, wr.camp, wr.rating, wr.notes FROM weekly_ratings wr JOIN staff s ON wr.staff_id = s.id ORDER BY wr.camp, s.name');
+      const map = {};
+      raw.forEach(r => {
+        const k = r.staff_id + '__' + r.camp;
+        if (!map[k]) map[k] = { staff_id: r.staff_id, name: r.name, camp: r.camp, ratings: [], notes_list: [] };
+        map[k].ratings.push(r.rating);
+        if (r.notes && r.notes.trim()) map[k].notes_list.push(r.notes);
+      });
+      rows = Object.values(map).map(m => ({
+        staff_id: m.staff_id, name: m.name, camp: m.camp, notes_list: m.notes_list,
+        avg_rating: m.ratings.length ? +(m.ratings.reduce((a,b)=>a+b,0)/m.ratings.length).toFixed(1) : 0,
+        rating_count: m.ratings.length,
+      }));
+    }
+    res.json(rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── Admin Data ────────────────────────────────────────────
