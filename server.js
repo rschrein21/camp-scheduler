@@ -405,6 +405,51 @@ if (IS_PG) {
       console.log('Applied migration: confirm_june1519_su_staff_2026_06_24 — 14 June 15–19 SU staff confirmed');
     }
 
+    // One-time: dedup staff created by migration with different email aliases
+    const dedupFlag = await pool.query(`SELECT 1 FROM migration_flags WHERE key = 'dedup_staff_aliases_2026_06_24'`);
+    if (dedupFlag.rows.length === 0) {
+      // Each entry: { keepId, dropId } — reassign requests from dropId to keepId, then remove dropId
+      const dupes = [
+        { keepId: 2,  dropId: 50 },  // Alana Lamb: keep alanalamb04@gmail.com, drop alamb1@seattleu.edu
+        { keepId: 37, dropId: 49 },  // Aleksander Kapciak: keep aleksanderkapciak07@gmail.com, drop akapciak07@gmail.com
+      ];
+      for (const { keepId, dropId } of dupes) {
+        const camp = 'June 15\u201319 \u00b7 Seattle University';
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+        for (const day of days) {
+          // Check if canonical already has this request
+          const existing = await pool.query(
+            `SELECT id FROM requests WHERE staff_id = $1 AND camp = $2 AND day = $3`,
+            [keepId, camp, day]
+          );
+          if (!existing.rows.length) {
+            // Move it from dup to canonical
+            await pool.query(
+              `UPDATE requests SET staff_id = $1 WHERE staff_id = $2 AND camp = $3 AND day = $4`,
+              [keepId, dropId, camp, day]
+            );
+          } else {
+            // Canonical already has it — just delete the dup
+            await pool.query(
+              `DELETE FROM requests WHERE staff_id = $1 AND camp = $2 AND day = $3`,
+              [dropId, camp, day]
+            );
+          }
+        }
+        // Also reassign any weekly_ratings from dropId to keepId
+        await pool.query(`DELETE FROM weekly_ratings WHERE staff_id = $1 AND camp = $2`, [keepId, camp]); // clear canonical first
+        await pool.query(`UPDATE weekly_ratings SET staff_id = $1 WHERE staff_id = $2`, [keepId, dropId]);
+        // Delete any remaining requests for dropId
+        await pool.query(`DELETE FROM requests WHERE staff_id = $1`, [dropId]);
+        // Delete any staff_ratings for dropId
+        await pool.query(`DELETE FROM staff_ratings WHERE staff_id = $1`, [dropId]);
+        // Delete the duplicate staff entry
+        await pool.query(`DELETE FROM staff WHERE id = $1`, [dropId]);
+      }
+      await pool.query(`INSERT INTO migration_flags (key) VALUES ('dedup_staff_aliases_2026_06_24')`);
+      console.log('Applied migration: dedup_staff_aliases_2026_06_24');
+    }
+
     // Allow multiple directors per camp per role — drop camp+role unique, enforce director+camp unique
     await pool.query(`ALTER TABLE director_assignments DROP CONSTRAINT IF EXISTS director_assignments_camp_role_key`);
     await pool.query(`
