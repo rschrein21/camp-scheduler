@@ -884,6 +884,11 @@ function requireAdmin(req, res, next) { req.session.admin ? next() : res.status(
 app.post('/api/director/login', async (req, res) => {
   try {
     const { phone, password } = req.body;
+    // Admin password grants full admin access through the director dashboard
+    if (password === ADMIN_PASSWORD) {
+      req.session.admin = true;
+      return res.json({ ok: true, director: { id: null, name: 'Admin', email: '' } });
+    }
     if (password !== DIRECTOR_PASSWORD) return res.status(401).json({ error: 'Wrong password' });
     const digits = (phone || '').replace(/\D/g, '').slice(-10);
     if (!digits) return res.status(400).json({ error: 'Please enter your phone number' });
