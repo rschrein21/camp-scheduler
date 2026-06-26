@@ -1,12 +1,12 @@
 {
-  "updated": "2026-06-25T10:00:58Z",
+  "updated": "2026-06-26T10:00:52Z",
   "camps": {
     "July 6\u201310 \u00b7 Lower Woodland": {
       "am": 7,
       "pm": 7,
       "fullDay": 64,
-      "halfDay": 5,
-      "total": 69
+      "halfDay": 6,
+      "total": 70
     },
     "Aug 10\u201314 \u00b7 Lower Woodland": {
       "am": 7,
@@ -31,10 +31,10 @@
     },
     "July 6\u201310 \u00b7 Seattle University": {
       "am": 4,
-      "pm": 3,
-      "fullDay": 30,
+      "pm": 4,
+      "fullDay": 31,
       "halfDay": 4,
-      "total": 34
+      "total": 35
     },
     "July 13\u201317 \u00b7 Seattle University": {
       "am": 6,
