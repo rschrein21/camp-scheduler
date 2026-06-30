@@ -1,5 +1,5 @@
 {
-  "updated": "2026-06-29T10:00:56Z",
+  "updated": "2026-06-30T10:00:58Z",
   "camps": {
     "July 6\u201310 \u00b7 Lower Woodland": {
       "am": 7,
@@ -32,9 +32,9 @@
     "July 6\u201310 \u00b7 Seattle University": {
       "am": 4,
       "pm": 4,
-      "fullDay": 35,
+      "fullDay": 34,
       "halfDay": 4,
-      "total": 39
+      "total": 38
     },
     "July 13\u201317 \u00b7 Seattle University": {
       "am": 6,
@@ -53,9 +53,9 @@
     "Aug 3\u20137 \u00b7 Washington Park": {
       "am": 9,
       "pm": 6,
-      "fullDay": 57,
+      "fullDay": 58,
       "halfDay": 31,
-      "total": 88
+      "total": 89
     },
     "July 20\u201324 \u00b7 Bothell": {
       "am": 5,
@@ -75,8 +75,8 @@
       "am": 2,
       "pm": 2,
       "fullDay": 17,
-      "halfDay": 2,
-      "total": 19
+      "halfDay": 3,
+      "total": 20
     },
     "July 6\u201310 \u00b7 Kirkland": {
       "am": 5,
