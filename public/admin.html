@@ -503,6 +503,10 @@ function renderSchedule() {
           <td>—</td>
           ${DAYS.map(day => {
             const sh = (d.daily_shifts && d.daily_shifts[day]) || 'full';
+            if (sh === 'full') {
+              const hrs = d.role === 'admin' ? '7:45am–3:45pm' : '8am–4pm';
+              return `<td><span class="day-badge db-full">Full Day (${hrs})</span></td>`;
+            }
             return `<td>${dayBadge(sh, false, day)}</td>`;
           }).join('')}
           <td></td><td></td>
