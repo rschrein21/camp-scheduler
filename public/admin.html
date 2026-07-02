@@ -264,9 +264,9 @@ const CAMP_NEEDS = {
   "July 20\u201324 \u00b7 Bothell": {am:5, pm:4},  // 47 AM / 39 PM campers
   "July 20\u201324 \u00b7 Seattle University": {am:6, pm:5},  // 55 AM / 46 PM campers
   "July 20\u201324 \u00b7 West Seattle Del Ridge": {am:3, pm:2},  // 22 AM / 18 PM campers
-  "July 6\u201310 \u00b7 Kirkland": {am:5, pm:4},  // 45 AM / 34 PM campers
+  "July 6\u201310 \u00b7 Kirkland": {am:5, pm:4},  // 46 AM / 35 PM campers
   "July 6\u201310 \u00b7 Lower Woodland": {am:7, pm:7},  // 70 AM / 64 PM campers
-  "July 6\u201310 \u00b7 Seattle University": {am:4, pm:4},  // 39 AM / 35 PM campers
+  "July 6\u201310 \u00b7 Seattle University": {am:4, pm:4},  // 40 AM / 36 PM campers
   "June 15\u201319 \u00b7 Seattle University": {am:12, pm:10},  // 117 AM / 91 PM campers
   "June 22\u201326 \u00b7 Seattle University": {am:8, pm:7},  // 73 AM / 65 PM campers
   "June 22\u201326 \u00b7 West Seattle Del Ridge": {am:11, pm:9},  // 106 AM / 90 PM campers
@@ -306,10 +306,11 @@ function switchTab(tab) {
 }
 
 async function load() {
-  const [sr, cr, cnr] = await Promise.all([fetch('/api/admin/submissions'), fetch('/api/admin/camps'), fetch('/api/admin/confirmations')]);
+  const [sr, cr, cnr, dr] = await Promise.all([fetch('/api/admin/submissions'), fetch('/api/admin/camps'), fetch('/api/admin/confirmations'), fetch('/api/admin/director-assignments')]);
   data.staff = await sr.json();
   data.camps = await cr.json();
   data.confirmations = cnr.ok ? await cnr.json() : [];
+  data.directors = dr.ok ? await dr.json() : [];
   // Index confirmations by staff_id + camp
   data.confirmMap = {};
   data.confirmations.forEach(c => { data.confirmMap[`${c.staff_id}|${c.camp}`] = c; });
@@ -538,6 +539,21 @@ function renderSchedule() {
           </td>
         </tr>`;
       });
+      // Director rows for this camp
+      const campDirs = (data.directors || []).filter(d => d.camp === campName)
+        .sort((a,b) => a.director_name.localeCompare(b.director_name));
+      if (campDirs.length) {
+        campDirs.forEach(d => {
+          const roleLabel = d.role === 'admin' ? 'Admin Dir.' : 'Skills Dir.';
+          html += `<tr style="background:#f0f4ff">
+            <td class="name-col"><strong>${d.director_name}</strong><br><span style="font-size:0.72rem;color:#6677aa">Director</span></td>
+            <td><span class="role-badge" style="background:#2244cc">${roleLabel}</span></td>
+            <td>—</td>
+            ${DAYS.map(day => `<td>${dayBadge('full', false, day)}</td>`).join('')}
+            <td></td><td></td><td></td>
+          </tr>`;
+        });
+      }
       html += `</tbody></table></div>`;
     }
     html += `</div>`;
@@ -1618,9 +1634,10 @@ async function loadToday() {
     return;
   }
 
-  // Get all confirmed staff for today's camps
-  const r = await fetch('/api/admin/camps');
+  // Get all confirmed staff + director assignments for today's camps
+  const [r, dr] = await Promise.all([fetch('/api/admin/camps'), fetch('/api/admin/director-assignments')]);
   const allCampRows = await r.json();
+  const allDirs = dr.ok ? await dr.json() : [];
 
   let html = `<div style="font-size:0.78rem;color:#888;margin-bottom:12px;font-weight:600">
     ${today.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'})} &mdash; ${activeCamps.length} active camp${activeCamps.length > 1 ? 's' : ''}
@@ -1650,7 +1667,10 @@ async function loadToday() {
     });
 
     const todayStaff = Object.values(staffMap).filter(s => s.days[todayDow]);
-    if (!todayStaff.length) return;
+    const campDirsToday = allDirs.filter(d => d.camp === campName)
+      .sort((a,b) => a.director_name.localeCompare(b.director_name));
+    if (!todayStaff.length && !campDirsToday.length) return;
+    const totalToday = todayStaff.length + campDirsToday.length;
 
     const [datePart, location] = campName.split(' · ');
     html += `<div style="background:#fff;border-radius:10px;margin-bottom:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
@@ -1659,7 +1679,7 @@ async function loadToday() {
           <div style="font-size:0.9rem;font-weight:700">${location}</div>
           <div style="font-size:0.78rem;color:#888">${datePart} &mdash; ${todayDow}</div>
         </div>
-        <div style="font-size:0.82rem;font-weight:700;color:#1a7a3a">${todayStaff.length} staff today</div>
+        <div style="font-size:0.82rem;font-weight:700;color:#1a7a3a">${totalToday} present today</div>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
         <tr style="background:#fafafa">
@@ -1687,6 +1707,18 @@ async function loadToday() {
         <td style="padding:8px 12px">${statusBadge}</td>
       </tr>`;
     });
+
+    // Director rows
+    campDirsToday.forEach(d => {
+      const roleLabel = d.role === 'admin' ? 'Admin Dir.' : 'Skills Dir.';
+      html += `<tr style="background:#f0f4ff;border-bottom:1px solid #e8eeff">
+        <td style="padding:8px 12px;font-weight:600">${d.director_name} <span style="font-size:0.7rem;color:#6677aa;font-weight:400">${roleLabel}</span></td>
+        <td style="padding:8px 12px"><span style="background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:8px;font-weight:700">Full</span></td>
+        <td style="padding:8px 12px;color:#ccc">—</td>
+        <td style="padding:8px 12px"><span style="color:#2244cc;font-weight:700">📋 Director</span></td>
+      </tr>`;
+    });
+
     html += `</table></div>`;
   });
 
