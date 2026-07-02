@@ -26,6 +26,17 @@
   .tab.active { color: #0066cc; border-color: #0066cc; }
   .content { max-width: 1600px; margin: 0 auto; padding: 20px 20px 60px; }
 
+  /* Week groups (collapsible) */
+  .week-group { margin-bottom: 6px; }
+  .week-hdr { display: flex; align-items: center; justify-content: space-between; padding: 9px 16px; background: #e8e8ec; border-radius: 8px; cursor: pointer; user-select: none; margin-bottom: 6px; border: 1px solid #d0d0d8; }
+  .week-hdr:hover { background: #dcdce4; }
+  .week-hdr-label { font-size: 0.85rem; font-weight: 700; color: #444; display: flex; align-items: center; gap: 10px; }
+  .week-hdr-badge { font-size: 0.72rem; background: #bbb; color: #fff; border-radius: 8px; padding: 2px 8px; font-weight: 600; }
+  .week-hdr-badge.done { background: #999; }
+  .week-hdr-toggle { font-size: 0.75rem; color: #888; font-weight: 700; transition: transform 0.15s; }
+  .week-body { overflow: hidden; }
+  .week-body.collapsed { display: none; }
+
   /* Camp view */
   .camp-section { background: #fff; border-radius: 10px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
   .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -354,6 +365,52 @@ function starsHtml(staffId, cur) {
   return [1,2,3,4,5].map(i => `<button class="star-btn" onclick="setRating(${staffId},${i})">${i<=cur?'★':'☆'}</button>`).join('');
 }
 
+// ── Week collapse helpers ───────────────────────────────────────────────────
+const MONTH_NUMS = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11,
+                     June:5,July:6,August:7 };
+function isWeekCompleted(weekLabel) {
+  // Parse e.g. "June 15–19", "July 6–10", "Aug 3–7"
+  const m = weekLabel.match(/^(\w+)\s+\d+[\u2013-](\d+)/);
+  if (!m) return false;
+  const mNum = MONTH_NUMS[m[1]];
+  if (mNum === undefined) return false;
+  const endDate = new Date(2026, mNum, parseInt(m[2]), 23, 59, 59);
+  return endDate < new Date();
+}
+function weekGroupId(weekLabel) {
+  return 'wg-' + weekLabel.replace(/[^a-z0-9]/gi,'_');
+}
+function toggleWeek(id) {
+  const body = document.getElementById(id + '-body');
+  const arrow = document.getElementById(id + '-arrow');
+  if (!body) return;
+  const collapsed = body.classList.toggle('collapsed');
+  if (arrow) arrow.textContent = collapsed ? '▼' : '▲';
+  try { const s = JSON.parse(localStorage.getItem('weekCollapse')||'{}'); s[id] = collapsed; localStorage.setItem('weekCollapse', JSON.stringify(s)); } catch(e){}
+}
+function openWeek(id) {
+  const body = document.getElementById(id + '-body');
+  const arrow = document.getElementById(id + '-arrow');
+  if (!body) return;
+  body.classList.remove('collapsed');
+  if (arrow) arrow.textContent = '▲';
+  try { const s = JSON.parse(localStorage.getItem('weekCollapse')||'{}'); s[id] = false; localStorage.setItem('weekCollapse', JSON.stringify(s)); } catch(e){}
+}
+function weekGroupHtml(weekLabel, campCount) {
+  const id = weekGroupId(weekLabel);
+  const done = isWeekCompleted(weekLabel);
+  // Check localStorage for saved state; default: completed weeks collapsed
+  let collapsed = done;
+  try { const s = JSON.parse(localStorage.getItem('weekCollapse')||'{}'); if (id in s) collapsed = s[id]; } catch(e){}
+  const badgeClass = done ? 'week-hdr-badge done' : 'week-hdr-badge';
+  const badgeText = done ? 'Completed' : `${campCount} camp${campCount!==1?'s':''}`;
+  const arrow = collapsed ? '▼' : '▲';
+  return {
+    open: `<div class="week-group" id="${id}"><div class="week-hdr" onclick="toggleWeek('${id}')"><span class="week-hdr-label">${weekLabel} <span class="${badgeClass}">${badgeText}</span></span><span class="week-hdr-toggle" id="${id}-arrow">${arrow}</span></div><div class="week-body${collapsed?' collapsed':''}" id="${id}-body">`,
+    close: `</div></div>`
+  };
+}
+
 // ── Schedule Tab (assigned staff only) ──────────────────────────────────────
 function renderSchedule() {
   const campMap = {};
@@ -378,13 +435,21 @@ function renderSchedule() {
     ? CAMP_ORDER.filter(c => campMap[c]).concat(Object.keys(campMap).filter(c => !CAMP_ORDER.includes(c)))
     : [];
 
+  // Pre-compute camp count per week for badge
+  const weekCampCount = {};
+  campOrder.forEach(c => { const w = c.split('\u00b7')[0].trim(); weekCampCount[w] = (weekCampCount[w]||0)+1; });
+
   let html = '';
   let lastWeek = null;
   campOrder.forEach(campName => {
     const need = CAMP_NEEDS[campName] || {am:0, pm:0};
     const staffArr = Object.values(campMap[campName]).sort((a,b) => a.name.localeCompare(b.name));
     const week = campName.split('\u00b7')[0].trim();
-    if (week !== lastWeek) { html += `<div class="week-divider">${week}</div>`; lastWeek = week; }
+    if (week !== lastWeek) {
+      if (lastWeek !== null) html += weekGroupHtml(lastWeek, weekCampCount[lastWeek]).close;
+      html += weekGroupHtml(week, weekCampCount[week]).open;
+      lastWeek = week;
+    }
 
     // Per-day confirmed headcount for this camp
     const dayCount = {};
@@ -477,6 +542,7 @@ function renderSchedule() {
     }
     html += `</div>`;
   });
+  if (lastWeek !== null) html += weekGroupHtml(lastWeek, weekCampCount[lastWeek]).close;
   document.getElementById('scheduleView').innerHTML = html || '<div class="empty">No assignments yet this season.</div>';
 }
 
@@ -517,6 +583,10 @@ function renderPool() {
   const campOrder = CAMP_ORDER.filter(c => poolMap[c])
     .concat(Object.keys(poolMap).filter(c => !CAMP_ORDER.includes(c)));
 
+  // Pre-compute camp count per week
+  const poolWeekCampCount = {};
+  campOrder.forEach(c => { const w = c.split('\u00b7')[0].trim(); poolWeekCampCount[w] = (poolWeekCampCount[w]||0)+1; });
+
   let html = '';
   let lastWeek = null;
   campOrder.forEach(campName => {
@@ -531,7 +601,11 @@ function renderPool() {
         return false; // confirmed only at a different camp this week — hide
       })
       .sort((a,b) => b.rating - a.rating || a.name.localeCompare(b.name));
-    if (week !== lastWeek) { html += `<div class="week-divider">${week}</div>`; lastWeek = week; }
+    if (week !== lastWeek) {
+      if (lastWeek !== null) html += weekGroupHtml(lastWeek, poolWeekCampCount[lastWeek]).close;
+      html += weekGroupHtml(week, poolWeekCampCount[week]).open;
+      lastWeek = week;
+    }
 
     // Remaining daily need: total_needed - confirmed - pending_in_pool
     const need = CAMP_NEEDS[campName] || {am:0, pm:0};
@@ -585,6 +659,7 @@ function renderPool() {
     });
     html += `</tbody></table></div></div>`;
   });
+  if (lastWeek !== null) html += weekGroupHtml(lastWeek, poolWeekCampCount[lastWeek]).close;
   document.getElementById('poolView').innerHTML = html || '<div class="empty">No pending availability submissions.</div>';
 }
 
