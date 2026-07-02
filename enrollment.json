@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-01T10:00:58Z",
+  "updated": "2026-07-02T10:00:55Z",
   "camps": {
     "July 6\u201310 \u00b7 Lower Woodland": {
       "am": 7,
@@ -32,9 +32,9 @@
     "July 6\u201310 \u00b7 Seattle University": {
       "am": 4,
       "pm": 4,
-      "fullDay": 35,
+      "fullDay": 36,
       "halfDay": 4,
-      "total": 39
+      "total": 40
     },
     "July 13\u201317 \u00b7 Seattle University": {
       "am": 6,
@@ -61,8 +61,8 @@
       "am": 5,
       "pm": 4,
       "fullDay": 39,
-      "halfDay": 8,
-      "total": 47
+      "halfDay": 11,
+      "total": 50
     },
     "July 13\u201317 \u00b7 Issaquah": {
       "am": 5,
@@ -72,18 +72,18 @@
       "total": 47
     },
     "Aug 10\u201314 \u00b7 Issaquah": {
-      "am": 2,
+      "am": 3,
       "pm": 2,
       "fullDay": 17,
-      "halfDay": 3,
-      "total": 20
+      "halfDay": 4,
+      "total": 21
     },
     "July 6\u201310 \u00b7 Kirkland": {
       "am": 5,
       "pm": 4,
-      "fullDay": 34,
+      "fullDay": 35,
       "halfDay": 11,
-      "total": 45
+      "total": 46
     },
     "Aug 3\u20137 \u00b7 Bellevue": {
       "am": 2,
@@ -109,9 +109,9 @@
     "July 13\u201317 \u00b7 West Seattle Hiawatha": {
       "am": 10,
       "pm": 9,
-      "fullDay": 81,
+      "fullDay": 82,
       "halfDay": 10,
-      "total": 91
+      "total": 92
     },
     "Aug 17\u201321 \u00b7 West Seattle Del Ridge": {
       "am": 10,
