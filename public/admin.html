@@ -465,6 +465,20 @@ function renderSchedule() {
         else if (eff === 'full') dayCount[d].full++;
       });
     });
+    // Include directors in daily totals
+    (data.directors || []).filter(dir =>
+      dir.camp === campName &&
+      dir.director_name.toLowerCase() !== 'rich schreiner' &&
+      dir.director_name.toLowerCase() !== 'richard schreiner'
+    ).forEach(dir => {
+      DAYS.forEach(d => {
+        const sh = (dir.daily_shifts && dir.daily_shifts[d]) || 'full';
+        if (sh === 'full') dayCount[d].full++;
+        else if (sh === 'am') dayCount[d].am++;
+        else if (sh === 'pm') dayCount[d].pm++;
+        // 'none' = director off that day, don't count
+      });
+    });
 
     html += `<div class="camp-section">
       <div class="camp-hdr" style="display:flex;align-items:center;justify-content:space-between">
