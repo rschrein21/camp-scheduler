@@ -208,10 +208,11 @@ def build_camp_needs(class_map, sess):
         lc = vals.get('late_care', 0)
         result[sched_name] = {
             'am': am, 'pm': pm,
+            'amCampers': total, 'pmCampers': vals['full'],
             'fullDay': vals['full'], 'halfDay': vals['half'], 'total': total,
             'earlyCare': ec, 'lateCare': lc,
         }
-        print(f"  {sched_name:<42} AM:{am:2} PM:{pm:2}  ({total} campers)  Early:{ec} Late:{lc}")
+        print(f"  {sched_name:<42} AM:{am:2} PM:{pm:2}  ({total} total / {vals['full']} full-day)  Early:{ec} Late:{lc}")
 
     return result
 
@@ -227,7 +228,7 @@ def update_admin_html(camp_needs):
              '// AM = all campers; PM = Full Day campers only; earlyCare/lateCare from extended care signups',
              'const CAMP_NEEDS = {']
     for name, v in sorted(camp_needs.items(), key=lambda x: x[0]):
-        lines.append(f'  {json.dumps(name)}: {{am:{v["am"]}, pm:{v["pm"]}, earlyCare:{v.get("earlyCare",0)}, lateCare:{v.get("lateCare",0)}}},  // {v["total"]} AM / {v["fullDay"]} PM campers  Early:{v.get("earlyCare",0)} Late:{v.get("lateCare",0)}')
+        lines.append(f'  {json.dumps(name)}: {{am:{v["am"]}, pm:{v["pm"]}, amCampers:{v.get("amCampers",0)}, pmCampers:{v.get("pmCampers",0)}, earlyCare:{v.get("earlyCare",0)}, lateCare:{v.get("lateCare",0)}}},  // {v["total"]} AM / {v["fullDay"]} PM campers  Early:{v.get("earlyCare",0)} Late:{v.get("lateCare",0)}')
     lines.append('};')
     new_block = '\n'.join(lines)
 
