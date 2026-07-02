@@ -490,7 +490,46 @@ function renderSchedule() {
           }).join('')}
           <th>BG</th><th>Response</th><th></th>
         </tr></thead><tbody>`;
-      staffArr.forEach(s => {
+      // Director rows for this camp
+      const campDirs = (data.directors || []).filter(d => d.camp === campName && d.director_name.toLowerCase() !== 'rich schreiner' && d.director_name.toLowerCase() !== 'richard schreiner')
+        .sort((a,b) => a.director_name.localeCompare(b.director_name));
+      campDirs.forEach(d => {
+        const roleLabel = d.role === 'admin' ? 'Admin Dir.' : 'Skills Dir.';
+        const dirDetailId = `dir-detail-${d.director_id}-${campName.replace(/[^a-z0-9]/gi,'_')}`;
+        const safecamp = campName.replace(/'/g,"\'");
+        html += `<tr style="background:#f0f4ff">
+          <td class="name-col"><strong>${d.director_name}</strong><br><span style="font-size:0.72rem;color:#6677aa">Director</span></td>
+          <td><span class="role-badge" style="background:#2244cc">${roleLabel}</span></td>
+          <td>—</td>
+          ${DAYS.map(day => {
+            const sh = (d.daily_shifts && d.daily_shifts[day]) || 'full';
+            return `<td>${dayBadge(sh, false, day)}</td>`;
+          }).join('')}
+          <td></td><td></td>
+          <td><button class="detail-btn" onclick="toggleDetails('${dirDetailId}')">Make Changes</button></td>
+        </tr>
+        <tr id="${dirDetailId}" class="detail-row" style="display:none">
+          <td colspan="${DAYS.length+6}">
+            <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+              ${DAYS.map(day => {
+                const cur = (d.daily_shifts && d.daily_shifts[day]) || 'full';
+                const saveCell = day === 'Wed'
+                  ? `<td style="padding-left:16px"><button onclick="saveDirChanges('${dirDetailId}',${d.director_id},'${safecamp}')" style="padding:7px 18px;background:#2244cc;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">Save Changes</button></td>`
+                  : '<td></td>';
+                return `<tr><td style="width:50px;font-weight:700">${day}</td>
+                  <td><select data-orig="${cur}" data-day="${day}" style="padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:0.75rem" onchange="markPendingChange(this)">
+                    <option value="none">— None (off)</option>
+                    <option value="am" ${cur==='am'?'selected':''}>AM</option>
+                    <option value="pm" ${cur==='pm'?'selected':''}>PM</option>
+                    <option value="full" ${cur==='full'?'selected':''}>Full Day</option>
+                  </select></td>${saveCell}</tr>`;
+              }).join('')}
+            </table>
+          </td>
+        </tr>`;
+      });
+
+            staffArr.forEach(s => {
         const detailId = `sch-detail-${s.staff_id}-${campName.replace(/[^a-z0-9]/gi,'_')}`;
         const safecamp = campName.replace(/'/g,"\\'");
         const ca = s.schedule_confirmed_at ? new Date(s.schedule_confirmed_at) : null;
@@ -533,44 +572,6 @@ function renderSchedule() {
                     <option value="am" ${selCS==='am'?'selected':''}>AM</option>
                     <option value="pm" ${selCS==='pm'?'selected':''}>PM</option>
                     <option value="full" ${selCS==='full'?'selected':''}>Full Day</option>
-                  </select></td>${saveCell}</tr>`;
-              }).join('')}
-            </table>
-          </td>
-        </tr>`;
-      });
-      // Director rows for this camp
-      const campDirs = (data.directors || []).filter(d => d.camp === campName)
-        .sort((a,b) => a.director_name.localeCompare(b.director_name));
-      campDirs.forEach(d => {
-        const roleLabel = d.role === 'admin' ? 'Admin Dir.' : 'Skills Dir.';
-        const dirDetailId = `dir-detail-${d.director_id}-${campName.replace(/[^a-z0-9]/gi,'_')}`;
-        const safecamp = campName.replace(/'/g,"\'");
-        html += `<tr style="background:#f0f4ff">
-          <td class="name-col"><strong>${d.director_name}</strong><br><span style="font-size:0.72rem;color:#6677aa">Director</span></td>
-          <td><span class="role-badge" style="background:#2244cc">${roleLabel}</span></td>
-          <td>—</td>
-          ${DAYS.map(day => {
-            const sh = (d.daily_shifts && d.daily_shifts[day]) || 'full';
-            return `<td>${dayBadge(sh, false, day)}</td>`;
-          }).join('')}
-          <td></td><td></td>
-          <td><button class="detail-btn" onclick="toggleDetails('${dirDetailId}')">Make Changes</button></td>
-        </tr>
-        <tr id="${dirDetailId}" class="detail-row" style="display:none">
-          <td colspan="${DAYS.length+6}">
-            <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
-              ${DAYS.map(day => {
-                const cur = (d.daily_shifts && d.daily_shifts[day]) || 'full';
-                const saveCell = day === 'Wed'
-                  ? `<td style="padding-left:16px"><button onclick="saveDirChanges('${dirDetailId}',${d.director_id},'${safecamp}')" style="padding:7px 18px;background:#2244cc;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">Save Changes</button></td>`
-                  : '<td></td>';
-                return `<tr><td style="width:50px;font-weight:700">${day}</td>
-                  <td><select data-orig="${cur}" data-day="${day}" style="padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:0.75rem" onchange="markPendingChange(this)">
-                    <option value="none">— None (off)</option>
-                    <option value="am" ${cur==='am'?'selected':''}>AM</option>
-                    <option value="pm" ${cur==='pm'?'selected':''}>PM</option>
-                    <option value="full" ${cur==='full'?'selected':''}>Full Day</option>
                   </select></td>${saveCell}</tr>`;
               }).join('')}
             </table>
@@ -1720,7 +1721,7 @@ async function loadToday() {
     });
 
     const todayStaff = Object.values(staffMap).filter(s => s.days[todayDow]);
-    const campDirsToday = allDirs.filter(d => d.camp === campName)
+    const campDirsToday = allDirs.filter(d => d.camp === campName && d.director_name.toLowerCase() !== 'rich schreiner' && d.director_name.toLowerCase() !== 'richard schreiner')
       .sort((a,b) => a.director_name.localeCompare(b.director_name));
     if (!todayStaff.length && !campDirsToday.length) return;
     const totalToday = todayStaff.length + campDirsToday.length;
