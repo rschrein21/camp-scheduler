@@ -136,21 +136,39 @@ def get_class_map(sess):
 
 
 def fetch_fee_counts(sess, camp_id, class_id):
+    """Returns {fee_type: count, ..., '_care': {yes_morning: n, yes_afternoon: n, yes_both: n}}"""
     url = f"{BASE}/director/report/1/2026/{camp_id}/{class_id}"
     r = sess.get(url, timeout=15)
     soup = BeautifulSoup(r.content, 'html.parser')
     for table in soup.find_all('table'):
         headers = [th.get_text(strip=True) for th in table.find_all('th')]
-        if 'Fee/Registration Type' in headers:
-            fi = headers.index('Fee/Registration Type')
-            counts = {}
-            for row in table.find_all('tr'):
-                cells = row.find_all('td')
-                if len(cells) > fi:
-                    fee = cells[fi].get_text(strip=True)
-                    if fee:
-                        counts[fee] = counts.get(fee, 0) + 1
-            return counts
+        if 'Fee/Registration Type' not in headers:
+            continue
+        fi = headers.index('Fee/Registration Type')
+        # Find extended care column (may be named slightly differently across camps)
+        care_col = None
+        for i, h in enumerate(headers):
+            if 'Extended Care' in h or 'extended care' in h.lower():
+                care_col = i
+                break
+        counts = {}
+        care = {'yes_morning': 0, 'yes_afternoon': 0, 'yes_both': 0}
+        for row in table.find_all('tr'):
+            cells = row.find_all('td')
+            if len(cells) > fi:
+                fee = cells[fi].get_text(strip=True)
+                if fee:
+                    counts[fee] = counts.get(fee, 0) + 1
+            if care_col is not None and len(cells) > care_col:
+                val = cells[care_col].get_text(strip=True).lower()
+                if 'morning and afternoon' in val:
+                    care['yes_both'] += 1
+                elif 'morning' in val:
+                    care['yes_morning'] += 1
+                elif 'afternoon' in val:
+                    care['yes_afternoon'] += 1
+        counts['_care'] = care
+        return counts
     return {}
 
 
@@ -172,6 +190,9 @@ def build_camp_needs(class_map, sess):
         counts = fetch_fee_counts(sess, cls['campId'], cls['classId'])
         grouped[(loc, dk)]['full'] += counts.get('Full Day', 0)
         grouped[(loc, dk)]['half'] += counts.get('Half Day', 0)
+        care = counts.get('_care', {})
+        grouped[(loc, dk)]['early_care'] = grouped[(loc, dk)].get('early_care', 0) + care.get('yes_morning', 0) + care.get('yes_both', 0)
+        grouped[(loc, dk)]['late_care'] = grouped[(loc, dk)].get('late_care', 0) + care.get('yes_afternoon', 0) + care.get('yes_both', 0)
         time.sleep(0.2)
 
     result = {}
@@ -183,11 +204,14 @@ def build_camp_needs(class_map, sess):
         total = vals['full'] + vals['half']
         am = math.ceil(total / 10)
         pm = math.ceil(vals['full'] / 10)
+        ec = vals.get('early_care', 0)
+        lc = vals.get('late_care', 0)
         result[sched_name] = {
             'am': am, 'pm': pm,
             'fullDay': vals['full'], 'halfDay': vals['half'], 'total': total,
+            'earlyCare': ec, 'lateCare': lc,
         }
-        print(f"  {sched_name:<42} AM:{am:2} PM:{pm:2}  ({total} campers)")
+        print(f"  {sched_name:<42} AM:{am:2} PM:{pm:2}  ({total} campers)  Early:{ec} Late:{lc}")
 
     return result
 
@@ -200,10 +224,10 @@ def update_admin_html(camp_needs):
 
     # Build replacement JS object
     lines = ['// Staff needs auto-updated from USSC enrollment (1 staff per 10 campers)',
-             '// AM = all campers; PM = Full Day campers only',
+             '// AM = all campers; PM = Full Day campers only; earlyCare/lateCare from extended care signups',
              'const CAMP_NEEDS = {']
     for name, v in sorted(camp_needs.items(), key=lambda x: x[0]):
-        lines.append(f'  {json.dumps(name)}: {{am:{v["am"]}, pm:{v["pm"]}}},  // {v["total"]} AM / {v["fullDay"]} PM campers')
+        lines.append(f'  {json.dumps(name)}: {{am:{v["am"]}, pm:{v["pm"]}, earlyCare:{v.get("earlyCare",0)}, lateCare:{v.get("lateCare",0)}}},  // {v["total"]} AM / {v["fullDay"]} PM campers  Early:{v.get("earlyCare",0)} Late:{v.get("lateCare",0)}')
     lines.append('};')
     new_block = '\n'.join(lines)
 
