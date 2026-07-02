@@ -432,9 +432,9 @@ function renderSchedule() {
     };
   });
 
-  const campOrder = Object.keys(campMap).length
-    ? CAMP_ORDER.filter(c => campMap[c]).concat(Object.keys(campMap).filter(c => !CAMP_ORDER.includes(c)))
-    : [];
+  // Show all camps from master list, even those with no confirmed staff yet
+  const staffCamps = new Set(Object.keys(campMap));
+  const campOrder = CAMP_ORDER.concat([...staffCamps].filter(c => !CAMP_ORDER.includes(c)));
 
   // Pre-compute camp count per week for badge
   const weekCampCount = {};
@@ -444,6 +444,7 @@ function renderSchedule() {
   let lastWeek = null;
   campOrder.forEach(campName => {
     const need = CAMP_NEEDS[campName] || {am:0, pm:0};
+    if (!campMap[campName]) campMap[campName] = {};
     const staffArr = Object.values(campMap[campName]).sort((a,b) => a.name.localeCompare(b.name));
     const week = campName.split('\u00b7')[0].trim();
     if (week !== lastWeek) {
