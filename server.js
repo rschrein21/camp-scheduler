@@ -267,6 +267,16 @@ if (IS_PG) {
     await pool.query(`ALTER TABLE requests ADD COLUMN IF NOT EXISTS confirmed_shift TEXT`);
     await pool.query(`ALTER TABLE director_assignments ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'skills'`);
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS director_daily_shifts (
+        id SERIAL PRIMARY KEY,
+        director_id INTEGER NOT NULL REFERENCES directors(id) ON DELETE CASCADE,
+        camp TEXT NOT NULL,
+        day TEXT NOT NULL,
+        shift TEXT NOT NULL DEFAULT 'full',
+        UNIQUE(director_id, camp, day)
+      )
+    `);
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS staff_confirmations (
         id SERIAL PRIMARY KEY,
         staff_id INTEGER NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
@@ -1503,8 +1513,39 @@ app.get('/api/admin/director-assignments', requireAdmin, async (req, res) => {
       JOIN directors d ON da.director_id = d.id
       ORDER BY da.camp, da.role
     `);
-    res.json(rows);
+    // Attach per-day shift overrides (default 'full' when absent)
+    const shifts = await query(`SELECT director_id, camp, day, shift FROM director_daily_shifts`);
+    const shiftMap = {};
+    shifts.forEach(s => {
+      const key = `${s.director_id}|${s.camp}`;
+      if (!shiftMap[key]) shiftMap[key] = {};
+      shiftMap[key][s.day] = s.shift;
+    });
+    const result = rows.map(r => ({
+      ...r,
+      daily_shifts: shiftMap[`${r.director_id}|${r.camp}`] || {}
+    }));
+    res.json(result);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/admin/director-shift — upsert a director's shift for one day at one camp
+app.post('/api/admin/director-shift', requireAdmin, async (req, res) => {
+  try {
+    const { director_id, camp, day, shift } = req.body;
+    if (!director_id || !camp || !day) return res.status(400).json({ error: 'director_id, camp, day required' });
+    if (!shift || shift === 'none') {
+      // Remove override → reverts to full day
+      await query('DELETE FROM director_daily_shifts WHERE director_id=$1 AND camp=$2 AND day=$3', [director_id, camp, day]);
+    } else {
+      await query(`
+        INSERT INTO director_daily_shifts (director_id, camp, day, shift)
+        VALUES ($1,$2,$3,$4)
+        ON CONFLICT (director_id, camp, day) DO UPDATE SET shift = EXCLUDED.shift
+      `, [director_id, camp, day, shift]);
+    }
+    res.json({ ok: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 app.post('/api/admin/director-assignments', requireAdmin, async (req, res) => {

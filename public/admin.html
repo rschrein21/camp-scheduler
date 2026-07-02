@@ -542,18 +542,41 @@ function renderSchedule() {
       // Director rows for this camp
       const campDirs = (data.directors || []).filter(d => d.camp === campName)
         .sort((a,b) => a.director_name.localeCompare(b.director_name));
-      if (campDirs.length) {
-        campDirs.forEach(d => {
-          const roleLabel = d.role === 'admin' ? 'Admin Dir.' : 'Skills Dir.';
-          html += `<tr style="background:#f0f4ff">
-            <td class="name-col"><strong>${d.director_name}</strong><br><span style="font-size:0.72rem;color:#6677aa">Director</span></td>
-            <td><span class="role-badge" style="background:#2244cc">${roleLabel}</span></td>
-            <td>—</td>
-            ${DAYS.map(day => `<td>${dayBadge('full', false, day)}</td>`).join('')}
-            <td></td><td></td><td></td>
-          </tr>`;
-        });
-      }
+      campDirs.forEach(d => {
+        const roleLabel = d.role === 'admin' ? 'Admin Dir.' : 'Skills Dir.';
+        const dirDetailId = `dir-detail-${d.director_id}-${campName.replace(/[^a-z0-9]/gi,'_')}`;
+        const safecamp = campName.replace(/'/g,"\'");
+        html += `<tr style="background:#f0f4ff">
+          <td class="name-col"><strong>${d.director_name}</strong><br><span style="font-size:0.72rem;color:#6677aa">Director</span></td>
+          <td><span class="role-badge" style="background:#2244cc">${roleLabel}</span></td>
+          <td>—</td>
+          ${DAYS.map(day => {
+            const sh = (d.daily_shifts && d.daily_shifts[day]) || 'full';
+            return `<td>${dayBadge(sh, false, day)}</td>`;
+          }).join('')}
+          <td></td><td></td>
+          <td><button class="detail-btn" onclick="toggleDetails('${dirDetailId}')">Make Changes</button></td>
+        </tr>
+        <tr id="${dirDetailId}" class="detail-row" style="display:none">
+          <td colspan="${DAYS.length+6}">
+            <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+              ${DAYS.map(day => {
+                const cur = (d.daily_shifts && d.daily_shifts[day]) || 'full';
+                const saveCell = day === 'Wed'
+                  ? `<td style="padding-left:16px"><button onclick="saveDirChanges('${dirDetailId}',${d.director_id},'${safecamp}')" style="padding:7px 18px;background:#2244cc;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">Save Changes</button></td>`
+                  : '<td></td>';
+                return `<tr><td style="width:50px;font-weight:700">${day}</td>
+                  <td><select data-orig="${cur}" data-day="${day}" style="padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:0.75rem" onchange="markPendingChange(this)">
+                    <option value="none">— None (off)</option>
+                    <option value="am" ${cur==='am'?'selected':''}>AM</option>
+                    <option value="pm" ${cur==='pm'?'selected':''}>PM</option>
+                    <option value="full" ${cur==='full'?'selected':''}>Full Day</option>
+                  </select></td>${saveCell}</tr>`;
+              }).join('')}
+            </table>
+          </td>
+        </tr>`;
+      });
       html += `</tbody></table></div>`;
     }
     html += `</div>`;
@@ -1295,6 +1318,36 @@ async function saveChanges(detailId, staffId, camp) {
   } else {
     if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
     alert('Error saving changes.');
+  }
+}
+
+// Director shift save
+async function saveDirChanges(detailId, directorId, camp) {
+  const detailRow = document.getElementById(detailId);
+  const selects = detailRow ? detailRow.querySelectorAll('select[data-day]') : [];
+  const updates = [];
+  selects.forEach(sel => {
+    if (sel.value !== sel.dataset.orig) updates.push({ day: sel.dataset.day, shift: sel.value });
+  });
+  if (!updates.length) return;
+  const saveBtn = detailRow ? detailRow.querySelector('button') : null;
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+  try {
+    for (const u of updates) {
+      await fetch('/api/admin/director-shift', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ director_id: directorId, camp, day: u.day, shift: u.shift })
+      });
+    }
+    if (saveBtn) { saveBtn.textContent = '\u2705 Saved'; saveBtn.style.background = '#1a5c36'; }
+    selects.forEach(sel => { sel.dataset.orig = sel.value; });
+    // Refresh director data
+    const dr = await fetch('/api/admin/director-assignments');
+    data.directors = dr.ok ? await dr.json() : data.directors;
+    renderSchedule();
+  } catch(e) {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Changes'; }
+    alert('Error saving director shifts.');
   }
 }
 
