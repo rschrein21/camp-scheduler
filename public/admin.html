@@ -1337,25 +1337,34 @@ async function saveDirChanges(detailId, directorId, camp) {
   selects.forEach(sel => {
     if (sel.value !== sel.dataset.orig) updates.push({ day: sel.dataset.day, shift: sel.value });
   });
-  if (!updates.length) return;
+  if (!updates.length) {
+    const saveBtn = detailRow ? detailRow.querySelector('button') : null;
+    if (saveBtn) { saveBtn.textContent = 'No changes'; setTimeout(() => { saveBtn.textContent = 'Save Changes'; }, 1500); }
+    return;
+  }
   const saveBtn = detailRow ? detailRow.querySelector('button') : null;
-  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving\u2026'; }
   try {
     for (const u of updates) {
-      await fetch('/api/admin/director-shift', {
+      const resp = await fetch('/api/admin/director-shift', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ director_id: directorId, camp, day: u.day, shift: u.shift })
       });
+      if (!resp.ok) throw new Error(`Server error ${resp.status}`);
     }
+    // Update data-orig so selects no longer show as pending
+    selects.forEach(sel => { sel.dataset.orig = sel.value; markPendingChange(sel); });
     if (saveBtn) { saveBtn.textContent = '\u2705 Saved'; saveBtn.style.background = '#1a5c36'; }
-    selects.forEach(sel => { sel.dataset.orig = sel.value; });
-    // Refresh director data
-    const dr = await fetch('/api/admin/director-assignments');
+    // Refresh director data and re-render — then re-open the detail row
+    const dr = await fetch('/api/admin/director-assignments?t=' + Date.now());
     data.directors = dr.ok ? await dr.json() : data.directors;
     renderSchedule();
+    // Re-open the detail row so Rich can see the updated shifts
+    const reopened = document.getElementById(detailId);
+    if (reopened) reopened.style.display = '';
   } catch(e) {
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Changes'; }
-    alert('Error saving director shifts.');
+    alert('Error saving director shifts: ' + e.message);
   }
 }
 
