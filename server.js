@@ -2397,7 +2397,7 @@ app.post('/api/admin/waitlist', requireAdmin, async (req, res) => {
         try {
           const digits = phone.replace(/\D/g, '');
           const e164 = digits.length === 10 ? `+1${digits}` : `+${digits}`;
-          const body = `This is Coach Rich from Nike Soccer Camps. I was not able to assign you a shift for the ${week} camps. I have added you to the waitlist and will be in touch if any shifts open up. Please let me know if you would like to be included or removed from the waitlist.`;
+          const body = `This is Coach Rich from Nike Soccer Camps. I was not able to assign you a shift for the ${week} camps. I have added you to the waitlist and will be in touch if any shifts open up. Please let me know if you would like to be removed from the waitlist.`;
           await twilioClient.messages.create({ body, from: TWILIO_FROM_NUMBER, to: e164 });
           if (IS_PG) {
             await query('UPDATE waitlist SET sms_sent_at = NOW() WHERE staff_id = $1 AND camp = $2', [staff_id, week]);
@@ -2434,7 +2434,7 @@ app.post('/api/internal/send-queued-waitlist-texts', async (req, res) => {
         if (!twilioClient) break;
         const digits = row.phone.replace(/\D/g, '');
         const e164 = digits.length === 10 ? `+1${digits}` : `+${digits}`;
-        const body = `This is Coach Rich from Nike Soccer Camps. I was not able to assign you a shift for the ${row.camp} camps. I have added you to the waitlist and will be in touch if any shifts open up. Please let me know if you would like to be included or removed from the waitlist.`;
+        const body = `This is Coach Rich from Nike Soccer Camps. I was not able to assign you a shift for the ${row.camp} camps. I have added you to the waitlist and will be in touch if any shifts open up. Please let me know if you would like to be removed from the waitlist.`;
         await twilioClient.messages.create({ body, from: TWILIO_FROM_NUMBER, to: e164 });
         if (IS_PG) {
           await query('UPDATE waitlist SET sms_sent_at = NOW() WHERE staff_id = $1 AND camp = $2', [row.staff_id, row.camp]);
