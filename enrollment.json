@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-03T10:00:59Z",
+  "updated": "2026-07-04T10:00:55Z",
   "camps": {
     "July 6\u201310 \u00b7 Lower Woodland": {
       "am": 7,
@@ -58,23 +58,23 @@
     },
     "July 13\u201317 \u00b7 Seattle University": {
       "am": 6,
-      "pm": 4,
-      "amCampers": 54,
-      "pmCampers": 40,
-      "fullDay": 40,
+      "pm": 5,
+      "amCampers": 56,
+      "pmCampers": 42,
+      "fullDay": 42,
       "halfDay": 14,
-      "total": 54,
-      "earlyCare": 2,
+      "total": 56,
+      "earlyCare": 3,
       "lateCare": 4
     },
     "July 20\u201324 \u00b7 Seattle University": {
       "am": 6,
       "pm": 5,
-      "amCampers": 55,
-      "pmCampers": 46,
-      "fullDay": 46,
+      "amCampers": 57,
+      "pmCampers": 48,
+      "fullDay": 48,
       "halfDay": 9,
-      "total": 55,
+      "total": 57,
       "earlyCare": 7,
       "lateCare": 10
     },
@@ -90,13 +90,13 @@
       "lateCare": 6
     },
     "July 20\u201324 \u00b7 Bothell": {
-      "am": 5,
+      "am": 6,
       "pm": 4,
-      "amCampers": 50,
-      "pmCampers": 39,
-      "fullDay": 39,
+      "amCampers": 51,
+      "pmCampers": 40,
+      "fullDay": 40,
       "halfDay": 11,
-      "total": 50,
+      "total": 51,
       "earlyCare": 1,
       "lateCare": 3
     },
@@ -169,11 +169,11 @@
     "July 13\u201317 \u00b7 West Seattle Hiawatha": {
       "am": 10,
       "pm": 9,
-      "amCampers": 92,
+      "amCampers": 93,
       "pmCampers": 82,
       "fullDay": 82,
-      "halfDay": 10,
-      "total": 92,
+      "halfDay": 11,
+      "total": 93,
       "earlyCare": 12,
       "lateCare": 14
     },
