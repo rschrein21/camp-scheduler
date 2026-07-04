@@ -1089,6 +1089,15 @@ function renderDailySummary() {
   document.getElementById('dailySummaryView').innerHTML = html;
 }
 
+function campSortKey(campName) {
+  const months = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+  const m = campName.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d+)/i);
+  if (!m) return 9999;
+  const mo = months[m[1].toLowerCase().slice(0,3)];
+  const day = parseInt(m[2]);
+  return mo * 100 + day;
+}
+
 function renderStaff(sortBy = 'priority') {
   let staff = [...data.staff];
   if (sortBy === 'priority') staff.sort((a,b) => b.priorityScore - a.priorityScore);
@@ -1142,7 +1151,7 @@ function renderStaff(sortBy = 'priority') {
       </div>
       <div class="camp-rows">`;
 
-    Object.keys(campMap).forEach(campName => {
+    Object.keys(campMap).sort((a,b) => campSortKey(a) - campSortKey(b)).forEach(campName => {
       const days = campMap[campName];
       html += `<div class="camp-row">
         <div class="camp-row-name">${campName}</div>
