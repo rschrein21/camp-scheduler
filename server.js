@@ -2416,6 +2416,17 @@ app.post('/api/admin/waitlist', requireAdmin, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// DELETE /api/admin/waitlist — remove a staff member from the waitlist for a week
+app.delete('/api/admin/waitlist', requireAdmin, async (req, res) => {
+  try {
+    const { staff_id, camp } = req.body;
+    if (!staff_id || !camp) return res.status(400).json({ error: 'staff_id and camp required' });
+    const week = camp.split('\u00b7')[0].trim();
+    await query('DELETE FROM waitlist WHERE staff_id = $1 AND camp = $2', [staff_id, week]);
+    res.json({ ok: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 // POST /api/internal/send-queued-waitlist-texts — flush unsent waitlist SMS (called by cron at 8am)
 app.post('/api/internal/send-queued-waitlist-texts', async (req, res) => {
   try {
