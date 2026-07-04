@@ -1523,6 +1523,22 @@ app.patch('/api/admin/staff/:id', requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
+// POST /api/admin/add-shift — add a confirmed shift for a staff member (admin override)
+app.post('/api/admin/add-shift', requireAdmin, async (req, res) => {
+  try {
+    const { staff_id, camp, day, shift, confirmed_shift } = req.body;
+    if (!staff_id || !camp || !day || !shift) return res.status(400).json({ error: 'staff_id, camp, day, shift required' });
+    const cs = confirmed_shift || shift;
+    const existing = await query('SELECT id FROM requests WHERE staff_id = $1 AND camp = $2 AND day = $3', [staff_id, camp, day]);
+    if (existing.length) {
+      await query("UPDATE requests SET status = 'confirmed', confirmed_shift = $1, shift = $2 WHERE id = $3", [cs, shift, existing[0].id]);
+    } else {
+      await query("INSERT INTO requests (staff_id, camp, day, shift, status, confirmed_shift) VALUES ($1,$2,$3,$4,'confirmed',$5)", [staff_id, camp, day, shift, cs]);
+    }
+    res.json({ ok: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: err.message }); }
+});
+
 app.delete('/api/admin/staff/:id', requireAdmin, async (req, res) => {
   try {
     const id = req.params.id;
