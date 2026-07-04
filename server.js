@@ -161,6 +161,15 @@ async function sendConfirmationNotification(staffName, staffEmail, staffPhone, c
   return result;
 }
 
+// ── Quiet-hours check (8am–10pm Pacific) ─────────────────
+function isQuietHours() {
+  const ptHour = parseInt(
+    new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', hour12: false }),
+    10
+  );
+  return ptHour < 8 || ptHour >= 22;
+}
+
 // ── Notification logging ─────────────────────────────────
 function logNotification(staffId, staffName, recipient, channel, message, camp, status) {
   const ts = IS_PG ? 'NOW()' : 'CURRENT_TIMESTAMP';
@@ -260,6 +269,14 @@ if (IS_PG) {
         camp TEXT NOT NULL DEFAULT '',
         status TEXT NOT NULL DEFAULT 'sent',
         sent_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS waitlist (
+        id SERIAL PRIMARY KEY,
+        staff_id INTEGER NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+        camp TEXT NOT NULL,
+        added_at TIMESTAMPTZ DEFAULT NOW(),
+        sms_sent_at TIMESTAMPTZ,
+        UNIQUE(staff_id, camp)
       );
     `);
     // Migrations: add columns that may be missing from tables created before schema updates
@@ -566,6 +583,14 @@ if (IS_PG) {
       camp TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'sent',
       sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS waitlist (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      staff_id INTEGER NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+      camp TEXT NOT NULL,
+      added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      sms_sent_at DATETIME,
+      UNIQUE(staff_id, camp)
     );
   `);
 
@@ -1285,7 +1310,12 @@ app.post('/api/admin/status', requireAdmin, async (req, res) => {
     if (status === 'confirmed') {
       const sid = staff_id || (req_id ? (await query('SELECT staff_id, camp FROM requests WHERE id = $1', [req_id]))[0]?.staff_id : null);
       const cmp = camp || (req_id ? (await query('SELECT camp FROM requests WHERE id = $1', [req_id]))[0]?.camp : null);
-      if (sid && cmp) maybeAutoConfirm(sid, cmp);
+      if (sid && cmp) {
+        maybeAutoConfirm(sid, cmp);
+        // Auto-remove from waitlist for this week
+        const week = cmp.split('\u00b7')[0].trim();
+        await query('DELETE FROM waitlist WHERE staff_id = $1 AND camp = $2', [sid, week]);
+      }
     }
 
     res.json({ ok: true });
@@ -1741,6 +1771,11 @@ app.post('/api/admin/batch-update-days', requireAdmin, async (req, res) => {
         'UPDATE requests SET status = $1, confirmed_shift = $2 WHERE id = $3',
         [u.status, u.confirmed_shift || null, u.req_id]
       );
+    }
+    // Auto-remove from waitlist if any day is being confirmed
+    if (camp && staff_id && updates.some(u => u.status === 'confirmed')) {
+      const week = camp.split('\u00b7')[0].trim();
+      await query('DELETE FROM waitlist WHERE staff_id = $1 AND camp = $2', [staff_id, week]);
     }
     if (notify && staff_id && camp) {
       try {
@@ -2308,6 +2343,112 @@ app.post('/api/staff/add-availability', async (req, res) => {
     }
 
     res.json({ ok: true, added: inserted });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── Waitlist ─────────────────────────────────────────
+
+// GET /api/admin/waitlist — all waitlist entries with staff info
+app.get('/api/admin/waitlist', requireAdmin, async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT w.id, w.staff_id, w.camp, w.added_at, w.sms_sent_at,
+             s.name as staff_name, s.phone, s.email
+      FROM waitlist w
+      JOIN staff s ON w.staff_id = s.id
+      ORDER BY w.camp, s.name
+    `);
+    res.json(rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/admin/waitlist — add a staff member to the waitlist for a week
+app.post('/api/admin/waitlist', requireAdmin, async (req, res) => {
+  try {
+    const { staff_id, camp } = req.body;
+    if (!staff_id || !camp) return res.status(400).json({ error: 'staff_id and camp required' });
+    // Derive week string from camp name (e.g. "July 7–11 · Seattle University" → "July 7–11")
+    const week = camp.split('\u00b7')[0].trim();
+    // Upsert into waitlist
+    if (IS_PG) {
+      await query(
+        `INSERT INTO waitlist (staff_id, camp) VALUES ($1,$2) ON CONFLICT (staff_id, camp) DO NOTHING`,
+        [staff_id, week]
+      );
+    } else {
+      await query(
+        `INSERT OR IGNORE INTO waitlist (staff_id, camp) VALUES ($1,$2)`,
+        [staff_id, week]
+      );
+    }
+    // Fetch staff info
+    const staffRows = await query('SELECT name, phone FROM staff WHERE id = $1', [staff_id]);
+    if (!staffRows.length) return res.status(404).json({ error: 'Staff not found' });
+    const { name, phone } = staffRows[0];
+    // Check if SMS already sent for this entry
+    const wlRow = await query('SELECT sms_sent_at FROM waitlist WHERE staff_id = $1 AND camp = $2', [staff_id, week]);
+    const alreadySent = wlRow.length && wlRow[0].sms_sent_at;
+    let smsSent = false;
+    let smsQueued = false;
+    if (!alreadySent && twilioClient && phone) {
+      if (isQuietHours()) {
+        smsQueued = true; // will be sent by the flush endpoint at 8am
+      } else {
+        try {
+          const digits = phone.replace(/\D/g, '');
+          const e164 = digits.length === 10 ? `+1${digits}` : `+${digits}`;
+          const body = `This is Coach Rich from Nike Soccer Camps. I was not able to assign you a shift for the ${week} camps. I have added you to the waitlist and will be in touch if any shifts open up. Please let me know if you would like to be included or removed from the waitlist.`;
+          await twilioClient.messages.create({ body, from: TWILIO_FROM_NUMBER, to: e164 });
+          if (IS_PG) {
+            await query('UPDATE waitlist SET sms_sent_at = NOW() WHERE staff_id = $1 AND camp = $2', [staff_id, week]);
+          } else {
+            await query('UPDATE waitlist SET sms_sent_at = CURRENT_TIMESTAMP WHERE staff_id = $1 AND camp = $2', [staff_id, week]);
+          }
+          logNotification(staff_id, name, phone, 'sms', `Waitlisted for ${week}`, week, 'sent');
+          smsSent = true;
+        } catch (e) {
+          console.error('Waitlist SMS error:', e.message);
+          logNotification(staff_id, name, phone, 'sms', `Waitlisted for ${week}`, week, 'failed');
+        }
+      }
+    }
+    res.json({ ok: true, week, smsSent, smsQueued, noPhone: !phone });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// POST /api/internal/send-queued-waitlist-texts — flush unsent waitlist SMS (called by cron at 8am)
+app.post('/api/internal/send-queued-waitlist-texts', async (req, res) => {
+  try {
+    if (isQuietHours()) return res.json({ ok: true, sent: 0, skipped: 'quiet hours' });
+    const rows = await query(`
+      SELECT w.staff_id, w.camp, s.name, s.phone
+      FROM waitlist w
+      JOIN staff s ON w.staff_id = s.id
+      WHERE w.sms_sent_at IS NULL AND s.phone IS NOT NULL AND s.phone != ''
+      ORDER BY w.camp, s.name
+    `);
+    if (!rows.length) return res.json({ ok: true, sent: 0 });
+    let sent = 0;
+    for (const row of rows) {
+      try {
+        if (!twilioClient) break;
+        const digits = row.phone.replace(/\D/g, '');
+        const e164 = digits.length === 10 ? `+1${digits}` : `+${digits}`;
+        const body = `This is Coach Rich from Nike Soccer Camps. I was not able to assign you a shift for the ${row.camp} camps. I have added you to the waitlist and will be in touch if any shifts open up. Please let me know if you would like to be included or removed from the waitlist.`;
+        await twilioClient.messages.create({ body, from: TWILIO_FROM_NUMBER, to: e164 });
+        if (IS_PG) {
+          await query('UPDATE waitlist SET sms_sent_at = NOW() WHERE staff_id = $1 AND camp = $2', [row.staff_id, row.camp]);
+        } else {
+          await query('UPDATE waitlist SET sms_sent_at = CURRENT_TIMESTAMP WHERE staff_id = $1 AND camp = $2', [row.staff_id, row.camp]);
+        }
+        logNotification(row.staff_id, row.name, row.phone, 'sms', `Waitlisted for ${row.camp}`, row.camp, 'sent');
+        sent++;
+      } catch (e) {
+        console.error('Queued waitlist SMS error:', e.message);
+        logNotification(row.staff_id, row.name, row.phone, 'sms', `Waitlisted for ${row.camp}`, row.camp, 'failed');
+      }
+    }
+    res.json({ ok: true, sent, total: rows.length });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

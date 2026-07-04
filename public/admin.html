@@ -306,15 +306,46 @@ function switchTab(tab) {
 }
 
 async function load() {
-  const [sr, cr, cnr, dr] = await Promise.all([fetch('/api/admin/submissions'), fetch('/api/admin/camps'), fetch('/api/admin/confirmations'), fetch('/api/admin/director-assignments')]);
+  const [sr, cr, cnr, dr, wlr] = await Promise.all([
+    fetch('/api/admin/submissions'),
+    fetch('/api/admin/camps'),
+    fetch('/api/admin/confirmations'),
+    fetch('/api/admin/director-assignments'),
+    fetch('/api/admin/waitlist')
+  ]);
   data.staff = await sr.json();
   data.camps = await cr.json();
   data.confirmations = cnr.ok ? await cnr.json() : [];
   data.directors = dr.ok ? await dr.json() : [];
+  data.waitlist = wlr.ok ? await wlr.json() : [];
   // Index confirmations by staff_id + camp
   data.confirmMap = {};
   data.confirmations.forEach(c => { data.confirmMap[`${c.staff_id}|${c.camp}`] = c; });
+  // Waitlist set: "staffId:week" for O(1) lookup
+  data.waitlistSet = new Set(data.waitlist.map(w => `${w.staff_id}:${w.camp}`));
   renderSchedule(); renderPool(); renderStaff(); renderDailySummary();
+}
+
+function weekFromCamp(camp) { return camp.split('\u00b7')[0].trim(); }
+
+async function waitlistStaff(staffId, camp, name) {
+  const week = weekFromCamp(camp);
+  if (!confirm(`Add ${name} to the waitlist for ${week}?`)) return;
+  const r = await fetch('/api/admin/waitlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ staff_id: staffId, camp })
+  });
+  const d = await r.json();
+  if (!r.ok) { alert('Error: ' + (d.error || 'Unknown error')); return; }
+  if (d.smsQueued) {
+    alert(`${name} added to the waitlist for ${week}.\nSMS will be sent at 8am (quiet hours currently).`);
+  } else if (d.smsSent) {
+    alert(`${name} added to the waitlist for ${week} and texted.`);
+  } else {
+    alert(`${name} added to the waitlist for ${week}.${d.noPhone ? '\nNo phone on file — no SMS sent.' : ''}`);
+  }
+  await load();
 }
 
 function shiftLabel(shift, day) {
@@ -551,6 +582,27 @@ function renderSchedule() {
         </tr>`;
       });
 
+      // Waitlisted coaches for this week — amber shaded rows
+      const waitlistedForWeek = (data.waitlist || []).filter(w => w.camp === week);
+      waitlistedForWeek.forEach(wl => {
+        // Only show if they have pending availability for this specific camp
+        const wlDays = {};
+        data.camps.filter(r => r.staff_id === wl.staff_id && r.camp === campName && r.status === 'pending')
+                  .forEach(r => { wlDays[r.day] = r; });
+        if (!Object.keys(wlDays).length) return;
+        html += `<tr style="background:#fff8e6">
+          <td class="name-col"><strong>${wl.staff_name}</strong><br><span style="font-size:0.72rem;color:#b35c00">&#9203; Waitlisted</span></td>
+          <td><span class="role-badge" style="background:#b35c00">Waitlist</span></td>
+          <td>—</td>
+          ${DAYS.map(d => {
+            const row = wlDays[d];
+            if (!row) return `<td>${dayBadge(null,false,d)}</td>`;
+            return `<td>${dayBadge(row.shift, false, d)}</td>`;
+          }).join('')}
+          <td></td><td></td><td></td>
+        </tr>`;
+      });
+
             staffArr.forEach(s => {
         const detailId = `sch-detail-${s.staff_id}-${campName.replace(/[^a-z0-9]/gi,'_')}`;
         const safecamp = campName.replace(/'/g,"\\'");
@@ -704,8 +756,13 @@ function renderPool() {
         </tr></thead><tbody>`;
     staffArr.forEach(s => {
       const safecamp = campName.replace(/'/g,"\\'");
-      html += `<tr>
-        <td class="name-col"><strong>${s.name}</strong><br><span style="font-size:0.72rem;color:#aaa">${s.email}</span></td>
+      const safename = s.name.replace(/'/g,"\\'");
+      const isWaitlisted = data.waitlistSet && data.waitlistSet.has(`${s.staff_id}:${week}`);
+      const rowBg = isWaitlisted ? 'background:#fff8e6;' : '';
+      html += `<tr style="${rowBg}">
+        <td class="name-col"><strong>${s.name}</strong><br><span style="font-size:0.72rem;color:#aaa">${s.email}</span>
+          ${isWaitlisted ? '<br><span style="font-size:0.7rem;font-weight:700;color:#b35c00;">&#9203; Waitlisted</span>' : ''}
+        </td>
         <td><span class="role-badge">${s.preferred_role||'?'}</span></td>
         <td><span class="rating-stars">${'★'.repeat(s.rating)}${'☆'.repeat(5-s.rating)}</span></td>
         ${DAYS.map(d => {
@@ -713,9 +770,14 @@ function renderPool() {
           if (!day) return `<td>${dayBadge(null,false,d)}</td>`;
           return `<td>${dayBadge(day.shift, false, d)}</td>`;
         }).join('')}
-        <td>
-          <button onclick="openAssignModal(${s.staff_id},'${safecamp}','${s.name.replace(/'/g,"\\'")}')"
+        <td style="white-space:nowrap">
+          <button onclick="openAssignModal(${s.staff_id},'${safecamp}','${safename}')"
             style="background:#111;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer">Assign</button>
+          ${isWaitlisted
+            ? ''
+            : `<button onclick="waitlistStaff(${s.staff_id},'${safecamp}','${safename}')"
+                style="background:#b35c00;color:#fff;border:none;padding:6px 10px;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer;margin-left:4px">Waitlist</button>`
+          }
         </td>
       </tr>`;
     });
