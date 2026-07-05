@@ -675,6 +675,29 @@ function renderPool() {
     poolMap[row.camp][k].days[row.day] = { shift: row.shift, req_id: row.req_id };
   });
 
+  // Synthesize pool entries for partial assignments:
+  // If staff said "full" but was only confirmed for AM or PM, the other half is still free.
+  data.camps.forEach(row => {
+    if (row.status !== 'confirmed') return;
+    if (row.shift !== 'full') return;
+    const cs = row.confirmed_shift;
+    if (cs !== 'am' && cs !== 'pm') return; // already full or no partial
+    const remaining = cs === 'am' ? 'pm' : 'am';
+    if (!poolMap[row.camp]) poolMap[row.camp] = {};
+    const k = row.staff_id;
+    if (!poolMap[row.camp][k]) poolMap[row.camp][k] = {
+      name: row.name, email: row.email, preferred_role: row.preferred_role,
+      rating: row.rating, staff_id: row.staff_id, days: {}
+    };
+    // Only add if not already in pool for this day (pending row takes precedence)
+    if (!poolMap[row.camp][k].days[row.day]) {
+      poolMap[row.camp][k].days[row.day] = {
+        shift: remaining, req_id: row.req_id,
+        isPartial: true, alreadyConfirmed: cs
+      };
+    }
+  });
+
   // Build map of confirmed camps per staff per week, keyed by "staffId:week" -> Set of camp names
   // Used to hide staff from the pool only when confirmed at a DIFFERENT location that week.
   // If they're confirmed at THIS camp (partial assign), they keep pending days and stay in the pool.
@@ -768,6 +791,11 @@ function renderPool() {
         ${DAYS.map(d => {
           const day = s.days[d];
           if (!day) return `<td>${dayBadge(null,false,d)}</td>`;
+          if (day.isPartial) {
+            const label = day.shift === 'pm' ? 'PM free' : 'AM free';
+            const color = day.shift === 'pm' ? '#8844cc' : '#0066cc';
+            return `<td><span style="display:inline-block;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;background:#f0e6ff;color:${color};border:1px dashed ${color}" title="Already confirmed ${day.alreadyConfirmed.toUpperCase()}">${label}</span></td>`;
+          }
           return `<td>${dayBadge(day.shift, false, d)}</td>`;
         }).join('')}
         <td style="white-space:nowrap">
@@ -806,6 +834,26 @@ function openAssignModal(staffId, camp, name) {
   const rows = DAYS.map(d => {
     const day = days[d];
     if (!day) return '';
+    if (day.isPartial) {
+      // Partial entry: staff was full-day available, already confirmed one half.
+      // Only show the remaining half + full as options; saving either maps to 'full'.
+      const remaining = day.shift; // 'am' or 'pm'
+      const alreadyLabel = day.alreadyConfirmed.toUpperCase();
+      const remainLabel = remaining === 'am' ? 'AM (8am–12pm)' : 'PM (12pm–4pm)';
+      const opts = [
+        `<option value="">— None</option>`,
+        `<option value="${remaining}" selected>${remainLabel}</option>`,
+        `<option value="full">Full Day (8:20am–3:20pm)</option>`,
+      ].join('');
+      return `<tr>
+        <td style="width:48px;font-weight:700;font-size:0.85rem">${d}</td>
+        <td>
+          <select data-reqid="${day.req_id}" data-day="${d}" data-partial="${day.alreadyConfirmed}"
+            style="padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;width:100%">${opts}</select>
+          <div style="font-size:0.68rem;color:#888;margin-top:2px">Already confirmed ${alreadyLabel} — assigning this adds the other half (saves as Full Day)</div>
+        </td>
+      </tr>`;
+    }
     const avail = day.shift || '';
     // Pre-select based on stated availability
     const presel = avail; // mirror what they said they can do
@@ -830,8 +878,14 @@ async function doAssignDays() {
   const updates = [];
   selects.forEach(sel => {
     if (!sel.value) return; // leave unselected days as pending — they stay in the pool
+    let confirmedShift = sel.value;
+    // Partial entry: staff was full-day available, already confirmed one half.
+    // Any selection (the remaining half or 'full') means they now cover the full day.
+    if (sel.dataset.partial) {
+      confirmedShift = 'full';
+    }
     updates.push({ req_id: parseInt(sel.dataset.reqid), day: sel.dataset.day,
-      status: 'confirmed', confirmed_shift: sel.value });
+      status: 'confirmed', confirmed_shift: confirmedShift });
   });
   if (!updates.length) { btn.disabled = false; btn.textContent = 'Save Assignment'; return; }
   const r = await fetch('/api/admin/batch-update-days', {
