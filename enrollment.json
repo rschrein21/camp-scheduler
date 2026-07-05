@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-04T10:00:55Z",
+  "updated": "2026-07-05T10:00:58Z",
   "camps": {
     "July 6\u201310 \u00b7 Lower Woodland": {
       "am": 7,
@@ -46,13 +46,13 @@
       "lateCare": 6
     },
     "July 6\u201310 \u00b7 Seattle University": {
-      "am": 4,
+      "am": 5,
       "pm": 4,
-      "amCampers": 40,
-      "pmCampers": 36,
-      "fullDay": 36,
-      "halfDay": 4,
-      "total": 40,
+      "amCampers": 43,
+      "pmCampers": 38,
+      "fullDay": 38,
+      "halfDay": 5,
+      "total": 43,
       "earlyCare": 4,
       "lateCare": 5
     },
@@ -70,11 +70,11 @@
     "July 20\u201324 \u00b7 Seattle University": {
       "am": 6,
       "pm": 5,
-      "amCampers": 57,
+      "amCampers": 58,
       "pmCampers": 48,
       "fullDay": 48,
-      "halfDay": 9,
-      "total": 57,
+      "halfDay": 10,
+      "total": 58,
       "earlyCare": 7,
       "lateCare": 10
     },
@@ -125,11 +125,11 @@
     "July 6\u201310 \u00b7 Kirkland": {
       "am": 5,
       "pm": 4,
-      "amCampers": 47,
-      "pmCampers": 35,
-      "fullDay": 35,
+      "amCampers": 48,
+      "pmCampers": 36,
+      "fullDay": 36,
       "halfDay": 12,
-      "total": 47,
+      "total": 48,
       "earlyCare": 4,
       "lateCare": 4
     },
