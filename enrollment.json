@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-05T10:00:58Z",
+  "updated": "2026-07-06T10:00:59Z",
   "camps": {
     "July 6\u201310 \u00b7 Lower Woodland": {
       "am": 7,
@@ -48,11 +48,11 @@
     "July 6\u201310 \u00b7 Seattle University": {
       "am": 5,
       "pm": 4,
-      "amCampers": 43,
-      "pmCampers": 38,
-      "fullDay": 38,
+      "amCampers": 44,
+      "pmCampers": 39,
+      "fullDay": 39,
       "halfDay": 5,
-      "total": 43,
+      "total": 44,
       "earlyCare": 4,
       "lateCare": 5
     },
@@ -169,11 +169,11 @@
     "July 13\u201317 \u00b7 West Seattle Hiawatha": {
       "am": 10,
       "pm": 9,
-      "amCampers": 93,
+      "amCampers": 94,
       "pmCampers": 82,
       "fullDay": 82,
-      "halfDay": 11,
-      "total": 93,
+      "halfDay": 12,
+      "total": 94,
       "earlyCare": 12,
       "lateCare": 14
     },
