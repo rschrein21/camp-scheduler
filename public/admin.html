@@ -409,8 +409,8 @@ function isWeekCompleted(weekLabel) {
   const endDate = new Date(2026, mNum, parseInt(m[2]), 23, 59, 59);
   return endDate < new Date();
 }
-function weekGroupId(weekLabel) {
-  return 'wg-' + weekLabel.replace(/[^a-z0-9]/gi,'_');
+function weekGroupId(weekLabel, scope) {
+  return (scope||'wg') + '-' + weekLabel.replace(/[^a-z0-9]/gi,'_');
 }
 function toggleWeek(id) {
   const body = document.getElementById(id + '-body');
@@ -428,8 +428,8 @@ function openWeek(id) {
   if (arrow) arrow.textContent = '▲';
   try { const s = JSON.parse(localStorage.getItem('weekCollapse')||'{}'); s[id] = false; localStorage.setItem('weekCollapse', JSON.stringify(s)); } catch(e){}
 }
-function weekGroupHtml(weekLabel, campCount) {
-  const id = weekGroupId(weekLabel);
+function weekGroupHtml(weekLabel, campCount, scope) {
+  const id = weekGroupId(weekLabel, scope);
   const done = isWeekCompleted(weekLabel);
   // Check localStorage for saved state; default: completed weeks collapsed
   let collapsed = done;
@@ -479,8 +479,8 @@ function renderSchedule() {
     const staffArr = Object.values(campMap[campName]).sort((a,b) => a.name.localeCompare(b.name));
     const week = campName.split('\u00b7')[0].trim();
     if (week !== lastWeek) {
-      if (lastWeek !== null) html += weekGroupHtml(lastWeek, weekCampCount[lastWeek]).close;
-      html += weekGroupHtml(week, weekCampCount[week]).open;
+      if (lastWeek !== null) html += weekGroupHtml(lastWeek, weekCampCount[lastWeek], 'sched').close;
+      html += weekGroupHtml(week, weekCampCount[week], 'sched').open;
       lastWeek = week;
     }
 
@@ -654,7 +654,7 @@ function renderSchedule() {
     }
     html += `</div>`;
   });
-  if (lastWeek !== null) html += weekGroupHtml(lastWeek, weekCampCount[lastWeek]).close;
+  if (lastWeek !== null) html += weekGroupHtml(lastWeek, weekCampCount[lastWeek], 'sched').close;
   document.getElementById('scheduleView').innerHTML = html || '<div class="empty">No assignments yet this season.</div>';
 }
 
@@ -737,8 +737,8 @@ function renderPool() {
       })
       .sort((a,b) => b.rating - a.rating || a.name.localeCompare(b.name));
     if (week !== lastWeek) {
-      if (lastWeek !== null) html += weekGroupHtml(lastWeek, poolWeekCampCount[lastWeek]).close;
-      html += weekGroupHtml(week, poolWeekCampCount[week]).open;
+      if (lastWeek !== null) html += weekGroupHtml(lastWeek, poolWeekCampCount[lastWeek], 'pool').close;
+      html += weekGroupHtml(week, poolWeekCampCount[week], 'pool').open;
       lastWeek = week;
     }
 
@@ -809,7 +809,7 @@ function renderPool() {
     });
     html += `</tbody></table></div></div>`;
   });
-  if (lastWeek !== null) html += weekGroupHtml(lastWeek, poolWeekCampCount[lastWeek]).close;
+  if (lastWeek !== null) html += weekGroupHtml(lastWeek, poolWeekCampCount[lastWeek], 'pool').close;
   document.getElementById('poolView').innerHTML = html || '<div class="empty">No pending availability submissions.</div>';
 }
 
