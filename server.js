@@ -646,7 +646,8 @@ app.post('/api/submit', async (req, res) => {
     let staffId;
     if (existing.length > 0) {
       staffId = existing[0].id;
-      await query('DELETE FROM requests WHERE staff_id = $1', [staffId]);
+      // Only delete non-confirmed requests — preserve admin-confirmed shifts
+      await query("DELETE FROM requests WHERE staff_id = $1 AND status NOT IN ('confirmed')", [staffId]);
       await query(
         'UPDATE staff SET name=$1, phone=$2, preferred_role=$3, shirt_size=$4, shorts_size=$5, birthdate=$6, address=$7, submitted_at=' + (IS_PG ? 'NOW()' : 'CURRENT_TIMESTAMP') + ' WHERE id=$8',
         [name, phone, preferred_role, shirt_size, shorts_size, birthdate, address, staffId]
