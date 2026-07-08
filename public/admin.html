@@ -637,17 +637,15 @@ function renderSchedule() {
               ${DAYS.map(d => {
                 const day = s.days[d]; if (!day) return '';
                 const selCS = day.status==='confirmed' ? (day.confirmed_shift||day.shift) : '';
-                const saveCell = d === 'Wed'
-                  ? `<td style="padding-left:16px"><button id="save-${detailId}" onclick="saveChanges('${detailId}',${s.staff_id},'${safecamp}')" style="padding:7px 18px;background:#1a7a3a;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">Save Changes</button></td>`
-                  : '<td></td>';
                 return `<tr><td style="width:50px;font-weight:700">${d}</td>
                   <td><select data-orig="${selCS}" data-reqid="${day.req_id}" data-day="${d}" style="padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:0.75rem" onchange="markPendingChange(this)">
                     <option value="" ${selCS===''?'selected':''}>— None</option>
                     <option value="am" ${selCS==='am'?'selected':''}>AM</option>
                     <option value="pm" ${selCS==='pm'?'selected':''}>PM</option>
                     <option value="full" ${selCS==='full'?'selected':''}>Full Day</option>
-                  </select></td>${saveCell}</tr>`;
+                  </select></td><td></td></tr>`;
               }).join('')}
+              <tr><td colspan="2"></td><td style="padding-left:16px;padding-top:6px"><button id="save-${detailId}" onclick="saveChanges('${detailId}',${s.staff_id},'${safecamp}')" style="padding:7px 18px;background:#1a7a3a;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">Save Changes</button></td></tr>
             </table>
           </td>
         </tr>`;
@@ -1100,9 +1098,6 @@ function renderCamps() {
                   : isNew
                     ? `<span style="font-size:0.7rem;background:#e8f4ff;color:#004499;padding:1px 6px;border-radius:4px;margin-left:4px">New: ${submitted.toUpperCase()}</span>`
                     : `<span style="font-size:0.7rem;color:#aaa;margin-left:4px">No change</span>`;
-                const saveCell = d === 'Wed'
-                  ? `<td style="padding-left:16px"><button id="save-${detailId}" onclick="saveChanges('${detailId}',${s.staff_id},'${safecamp}')" style="padding:7px 18px;background:#1a7a3a;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">Save Changes</button></td>`
-                  : '<td></td>';
                 return `<tr style="${changed||isNew ? 'background:#fffdf0' : ''}">
                   <td style="width:50px;font-weight:700">${d}</td>
                   <td style="font-size:0.78rem">${changeLabel}</td>
@@ -1114,9 +1109,10 @@ function renderCamps() {
                       <option value="full" ${selCS==='full'?'selected':''}>Full Day</option>
                     </select>
                   </td>
-                  ${saveCell}
+                  <td></td>
                 </tr>`;
               }).join('')}
+              <tr><td colspan="2"></td><td style="padding-left:16px;padding-top:6px"><button id="save-${detailId}" onclick="saveChanges('${detailId}',${s.staff_id},'${safecamp}')" style="padding:7px 18px;background:#1a7a3a;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">Save Changes</button></td></tr>
             </table>
           </td>
         </tr>`;
