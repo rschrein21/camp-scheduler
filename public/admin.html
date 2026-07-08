@@ -416,7 +416,9 @@ function toggleWeek(id) {
   const body = document.getElementById(id + '-body');
   const arrow = document.getElementById(id + '-arrow');
   if (!body) return;
-  const collapsed = body.classList.toggle('collapsed');
+  const collapsed = body.style.display === 'none' ? false : true; // currently visible → collapse
+  body.style.display = collapsed ? 'none' : '';
+  body.classList.toggle('collapsed', collapsed);
   if (arrow) arrow.textContent = collapsed ? '▼' : '▲';
   try { const s = JSON.parse(localStorage.getItem('weekCollapse')||'{}'); s[id] = collapsed; localStorage.setItem('weekCollapse', JSON.stringify(s)); } catch(e){}
 }
@@ -424,6 +426,7 @@ function openWeek(id) {
   const body = document.getElementById(id + '-body');
   const arrow = document.getElementById(id + '-arrow');
   if (!body) return;
+  body.style.display = '';
   body.classList.remove('collapsed');
   if (arrow) arrow.textContent = '▲';
   try { const s = JSON.parse(localStorage.getItem('weekCollapse')||'{}'); s[id] = false; localStorage.setItem('weekCollapse', JSON.stringify(s)); } catch(e){}
@@ -438,7 +441,7 @@ function weekGroupHtml(weekLabel, campCount, scope) {
   const badgeText = done ? 'Completed' : `${campCount} camp${campCount!==1?'s':''}`;
   const arrow = collapsed ? '▼' : '▲';
   return {
-    open: `<div class="week-group" id="${id}"><div class="week-hdr" onclick="toggleWeek('${id}')"><span class="week-hdr-label">${weekLabel} <span class="${badgeClass}">${badgeText}</span></span><span class="week-hdr-toggle" id="${id}-arrow">${arrow}</span></div><div class="week-body${collapsed?' collapsed':''}" id="${id}-body">`,
+    open: `<div class="week-group" id="${id}"><div class="week-hdr" onclick="toggleWeek('${id}')"><span class="week-hdr-label">${weekLabel} <span class="${badgeClass}">${badgeText}</span></span><span class="week-hdr-toggle" id="${id}-arrow">${arrow}</span></div><div class="week-body${collapsed?' collapsed':''}" id="${id}-body" style="${collapsed?'display:none':''}">`,
     close: `</div></div>`
   };
 }
