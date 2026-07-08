@@ -416,11 +416,14 @@ function toggleWeek(id) {
   const body = document.getElementById(id + '-body');
   const arrow = document.getElementById(id + '-arrow');
   if (!body) return;
-  const collapsed = body.style.display === 'none' ? false : true; // currently visible → collapse
-  body.style.display = collapsed ? 'none' : '';
-  body.classList.toggle('collapsed', collapsed);
-  if (arrow) arrow.textContent = collapsed ? '▼' : '▲';
-  try { const s = JSON.parse(localStorage.getItem('weekCollapse')||'{}'); s[id] = collapsed; localStorage.setItem('weekCollapse', JSON.stringify(s)); } catch(e){}
+  // Use data-collapsed as single source of truth (reliable across hidden containers and re-renders)
+  const isCollapsed = body.dataset.collapsed === 'true';
+  const newCollapsed = !isCollapsed;
+  body.dataset.collapsed = newCollapsed;
+  body.style.display = newCollapsed ? 'none' : '';
+  body.classList.toggle('collapsed', newCollapsed);
+  if (arrow) arrow.textContent = newCollapsed ? '▼' : '▲';
+  try { const s = JSON.parse(localStorage.getItem('weekCollapse')||'{}'); s[id] = newCollapsed; localStorage.setItem('weekCollapse', JSON.stringify(s)); } catch(e){}
 }
 function openWeek(id) {
   const body = document.getElementById(id + '-body');
@@ -441,7 +444,7 @@ function weekGroupHtml(weekLabel, campCount, scope) {
   const badgeText = done ? 'Completed' : `${campCount} camp${campCount!==1?'s':''}`;
   const arrow = collapsed ? '▼' : '▲';
   return {
-    open: `<div class="week-group" id="${id}"><div class="week-hdr" onclick="toggleWeek('${id}')"><span class="week-hdr-label">${weekLabel} <span class="${badgeClass}">${badgeText}</span></span><span class="week-hdr-toggle" id="${id}-arrow">${arrow}</span></div><div class="week-body${collapsed?' collapsed':''}" id="${id}-body" style="${collapsed?'display:none':''}">`,
+    open: `<div class="week-group" id="${id}"><div class="week-hdr" onclick="toggleWeek('${id}')"><span class="week-hdr-label">${weekLabel} <span class="${badgeClass}">${badgeText}</span></span><span class="week-hdr-toggle" id="${id}-arrow">${arrow}</span></div><div class="week-body${collapsed?' collapsed':''}" id="${id}-body" data-collapsed="${collapsed}" style="${collapsed?'display:none':''}">`,
     close: `</div></div>`
   };
 }
