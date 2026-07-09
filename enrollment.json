@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-08T10:01:02Z",
+  "updated": "2026-07-09T10:01:01Z",
   "camps": {
     "July 6\u201310 \u00b7 Lower Woodland": {
       "am": 7,
@@ -57,13 +57,13 @@
       "lateCare": 5
     },
     "July 13\u201317 \u00b7 Seattle University": {
-      "am": 6,
+      "am": 7,
       "pm": 5,
-      "amCampers": 59,
+      "amCampers": 61,
       "pmCampers": 43,
       "fullDay": 43,
-      "halfDay": 16,
-      "total": 59,
+      "halfDay": 18,
+      "total": 61,
       "earlyCare": 3,
       "lateCare": 4
     },
@@ -91,12 +91,12 @@
     },
     "July 20\u201324 \u00b7 Bothell": {
       "am": 6,
-      "pm": 4,
-      "amCampers": 52,
-      "pmCampers": 40,
-      "fullDay": 40,
+      "pm": 5,
+      "amCampers": 53,
+      "pmCampers": 41,
+      "fullDay": 41,
       "halfDay": 12,
-      "total": 52,
+      "total": 53,
       "earlyCare": 1,
       "lateCare": 3
     },
@@ -147,11 +147,11 @@
     "Aug 17\u201321 \u00b7 Bellevue": {
       "am": 3,
       "pm": 2,
-      "amCampers": 25,
+      "amCampers": 26,
       "pmCampers": 19,
       "fullDay": 19,
-      "halfDay": 6,
-      "total": 25,
+      "halfDay": 7,
+      "total": 26,
       "earlyCare": 2,
       "lateCare": 2
     },
@@ -169,11 +169,11 @@
     "July 13\u201317 \u00b7 West Seattle Hiawatha": {
       "am": 10,
       "pm": 9,
-      "amCampers": 95,
-      "pmCampers": 83,
-      "fullDay": 83,
+      "amCampers": 98,
+      "pmCampers": 86,
+      "fullDay": 86,
       "halfDay": 12,
-      "total": 95,
+      "total": 98,
       "earlyCare": 12,
       "lateCare": 15
     },
