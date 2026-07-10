@@ -784,14 +784,11 @@ function renderPool() {
         <h3 style="flex:none">${campName}</h3>
         <span class="staff-count">${staffArr.length} available</span>
         ${(need.am > 0 || need.pm > 0) ? `
-        <div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:0.82rem">
-          <span style="font-weight:700;color:#555">Need:</span>
-          <span style="color:#0066cc;font-weight:700">AM ${need.am}</span>
-          <span style="color:#8844cc;font-weight:700">PM ${need.pm}</span>
-          <span style="color:#999;margin:0 4px">|</span>
-          <span style="font-weight:700;color:#555">Still needed (worst day):</span>
-          <span style="color:${remColor(maxRemAM)};font-weight:700">AM ${maxRemAM}</span>
-          <span style="color:${remColor(maxRemPM)};font-weight:700">PM ${maxRemPM}</span>
+        <div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:0.82rem">
+          <span style="font-weight:700;color:#555">Need: <span style="color:#0066cc">AM ${need.am}</span> <span style="color:#8844cc">PM ${need.pm}</span></span>
+          <span style="color:#bbb">|</span>
+          <span style="font-weight:700;color:#555">Still needed:</span>
+          ${DAYS.map(d => `<span style="white-space:nowrap"><strong style="color:#555">${d}:</strong> <span style="color:${remColor(remByDay[d].am)};font-weight:700">AM ${remByDay[d].am}</span> <span style="color:${remColor(remByDay[d].pm)};font-weight:700">PM ${remByDay[d].pm}</span></span>`).join('<span style="color:#ddd">|</span>')}
         </div>` : ''}
       </div>
       <div class="table-scroll"><table class="sched">
