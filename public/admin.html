@@ -783,13 +783,7 @@ function renderPool() {
       <div class="camp-hdr" style="flex-wrap:wrap;gap:6px">
         <h3 style="flex:none">${campName}</h3>
         <span class="staff-count">${staffArr.length} available</span>
-        ${(need.am > 0 || need.pm > 0) ? `
-        <div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:0.82rem">
-          <span style="font-weight:700;color:#555">Need: <span style="color:#0066cc">AM ${need.am}</span> <span style="color:#8844cc">PM ${need.pm}</span></span>
-          <span style="color:#bbb">|</span>
-          <span style="font-weight:700;color:#555">Still needed:</span>
-          ${DAYS.map(d => `<span style="white-space:nowrap"><strong style="color:#555">${d}:</strong> <span style="color:${remColor(remByDay[d].am)};font-weight:700">AM ${remByDay[d].am}</span> <span style="color:${remColor(remByDay[d].pm)};font-weight:700">PM ${remByDay[d].pm}</span></span>`).join('<span style="color:#ddd">|</span>')}
-        </div>` : ''}
+
       </div>
       <div class="table-scroll"><table class="sched">
         <thead><tr>
@@ -803,23 +797,7 @@ function renderPool() {
             return `<th>${d}<div style="font-size:0.68rem;font-weight:500;margin-top:2px;white-space:nowrap">${sub}</div></th>`;
           }).join('')}
           <th>Assign</th>
-        </tr></thead><tbody>
-        ${(need.am > 0 || need.pm > 0) ? `<tr style="background:#f4f6fa;font-size:0.78rem;font-weight:700">
-          <td class="name-col" style="color:#444">Coaches Needed</td>
-          <td colspan="2" style="color:#888;font-size:0.72rem">target → scheduled → left</td>
-          ${DAYS.map(d => {
-            const totalAM = confDay[d].am + pendDay[d].am;
-            const totalPM = confDay[d].pm + pendDay[d].pm;
-            const remAM = remByDay[d].am;
-            const remPM = remByDay[d].pm;
-            return `<td style="white-space:nowrap;line-height:1.7">
-              <div><span style="color:#0055aa">${need.am}</span> → <span style="color:#555">${totalAM}</span> → <span style="color:${remColor(remAM)};font-weight:800">${remAM}</span> <span style="font-size:0.68rem;color:#888">AM</span></div>
-              <div><span style="color:#7722bb">${need.pm}</span> → <span style="color:#555">${totalPM}</span> → <span style="color:${remColor(remPM)};font-weight:800">${remPM}</span> <span style="font-size:0.68rem;color:#888">PM</span></div>
-            </td>`;
-          }).join('')}
-          <td></td>
-        </tr>` : ''}
-        `;
+        </tr></thead><tbody>`;
     staffArr.forEach(s => {
       const safecamp = campName.replace(/'/g,"\\'");
       const safename = s.name.replace(/'/g,"\\'");
