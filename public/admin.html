@@ -770,8 +770,8 @@ function renderPool() {
     const remByDay = {};
     DAYS.forEach(d => {
       remByDay[d] = {
-        am: Math.max(0, need.am - confDay[d].am - pendDay[d].am),
-        pm: Math.max(0, need.pm - confDay[d].pm - pendDay[d].pm)
+        am: Math.max(0, need.am - confDay[d].am),
+        pm: Math.max(0, need.pm - confDay[d].pm)
       };
     });
     // Worst-case remaining across the week (most understaffed day)
