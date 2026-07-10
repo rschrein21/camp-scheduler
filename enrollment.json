@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-09T10:01:01Z",
+  "updated": "2026-07-10T10:01:02Z",
   "camps": {
     "July 6\u201310 \u00b7 Lower Woodland": {
       "am": 7,
@@ -57,14 +57,14 @@
       "lateCare": 5
     },
     "July 13\u201317 \u00b7 Seattle University": {
-      "am": 7,
+      "am": 6,
       "pm": 5,
-      "amCampers": 61,
-      "pmCampers": 43,
-      "fullDay": 43,
+      "amCampers": 60,
+      "pmCampers": 42,
+      "fullDay": 42,
       "halfDay": 18,
-      "total": 61,
-      "earlyCare": 3,
+      "total": 60,
+      "earlyCare": 2,
       "lateCare": 4
     },
     "July 20\u201324 \u00b7 Seattle University": {
@@ -114,11 +114,11 @@
     "Aug 10\u201314 \u00b7 Issaquah": {
       "am": 3,
       "pm": 2,
-      "amCampers": 21,
+      "amCampers": 22,
       "pmCampers": 17,
       "fullDay": 17,
-      "halfDay": 4,
-      "total": 21,
+      "halfDay": 5,
+      "total": 22,
       "earlyCare": 1,
       "lateCare": 3
     },
@@ -126,9 +126,9 @@
       "am": 5,
       "pm": 4,
       "amCampers": 50,
-      "pmCampers": 39,
-      "fullDay": 39,
-      "halfDay": 11,
+      "pmCampers": 40,
+      "fullDay": 40,
+      "halfDay": 10,
       "total": 50,
       "earlyCare": 4,
       "lateCare": 4
@@ -147,11 +147,11 @@
     "Aug 17\u201321 \u00b7 Bellevue": {
       "am": 3,
       "pm": 2,
-      "amCampers": 26,
+      "amCampers": 25,
       "pmCampers": 19,
       "fullDay": 19,
-      "halfDay": 7,
-      "total": 26,
+      "halfDay": 6,
+      "total": 25,
       "earlyCare": 2,
       "lateCare": 2
     },
@@ -180,22 +180,22 @@
     "Aug 17\u201321 \u00b7 West Seattle Del Ridge": {
       "am": 10,
       "pm": 8,
-      "amCampers": 99,
-      "pmCampers": 76,
-      "fullDay": 76,
+      "amCampers": 100,
+      "pmCampers": 77,
+      "fullDay": 77,
       "halfDay": 23,
-      "total": 99,
+      "total": 100,
       "earlyCare": 21,
       "lateCare": 15
     },
     "July 20\u201324 \u00b7 West Seattle Del Ridge": {
       "am": 3,
       "pm": 2,
-      "amCampers": 24,
-      "pmCampers": 18,
-      "fullDay": 18,
+      "amCampers": 25,
+      "pmCampers": 19,
+      "fullDay": 19,
       "halfDay": 6,
-      "total": 24,
+      "total": 25,
       "earlyCare": 3,
       "lateCare": 1
     }
