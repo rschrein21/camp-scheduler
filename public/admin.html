@@ -766,16 +766,42 @@ function renderPool() {
       });
     });
 
+    // Per-day remaining after confirmed + pending
+    const remByDay = {};
+    DAYS.forEach(d => {
+      remByDay[d] = {
+        am: Math.max(0, need.am - confDay[d].am - pendDay[d].am),
+        pm: Math.max(0, need.pm - confDay[d].pm - pendDay[d].pm)
+      };
+    });
+    // Worst-case remaining across the week (most understaffed day)
+    const maxRemAM = Math.max(...DAYS.map(d => remByDay[d].am));
+    const maxRemPM = Math.max(...DAYS.map(d => remByDay[d].pm));
+    const remColor = (v) => v === 0 ? '#1a8c1a' : v <= 2 ? '#b35c00' : '#c0392b';
+
     html += `<div class="camp-section">
-      <div class="camp-hdr"><h3>${campName}</h3><span class="staff-count">${staffArr.length} available</span></div>
+      <div class="camp-hdr" style="flex-wrap:wrap;gap:6px">
+        <h3 style="flex:none">${campName}</h3>
+        <span class="staff-count">${staffArr.length} available</span>
+        ${(need.am > 0 || need.pm > 0) ? `
+        <div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:0.82rem">
+          <span style="font-weight:700;color:#555">Need:</span>
+          <span style="color:#0066cc;font-weight:700">AM ${need.am}</span>
+          <span style="color:#8844cc;font-weight:700">PM ${need.pm}</span>
+          <span style="color:#999;margin:0 4px">|</span>
+          <span style="font-weight:700;color:#555">Still needed (worst day):</span>
+          <span style="color:${remColor(maxRemAM)};font-weight:700">AM ${maxRemAM}</span>
+          <span style="color:${remColor(maxRemPM)};font-weight:700">PM ${maxRemPM}</span>
+        </div>` : ''}
+      </div>
       <div class="table-scroll"><table class="sched">
         <thead><tr>
           <th class="name-col">Staff</th><th>Role</th><th>Rating</th>
           ${DAYS.map(d => {
-            const remAM = Math.max(0, need.am - confDay[d].am);
-            const remPM = Math.max(0, need.pm - confDay[d].pm);
+            const remAM = remByDay[d].am;
+            const remPM = remByDay[d].pm;
             const sub = (need.am > 0 || need.pm > 0)
-              ? `<span style="color:#0066cc">AM:${remAM}</span> <span style="color:#8844cc">PM:${remPM}</span>`
+              ? `<span style="color:${remColor(remAM)}">AM:${remAM}</span> <span style="color:${remColor(remPM)}">PM:${remPM}</span>`
               : '<span style="color:#ccc">—</span>';
             return `<th>${d}<div style="font-size:0.68rem;font-weight:500;margin-top:2px;white-space:nowrap">${sub}</div></th>`;
           }).join('')}
