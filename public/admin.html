@@ -919,7 +919,14 @@ async function doAssignDays() {
     const cr = await fetch('/api/admin/camps');
     data.camps = await cr.json();
     renderSchedule(); renderPool();
-    switchTab('schedule');
+    switchTab('pool');
+    // Scroll back to the camp that was just assigned
+    setTimeout(() => {
+      const headers = document.querySelectorAll('#poolView h3');
+      for (const h of headers) {
+        if (h.textContent.trim() === camp) { h.closest('.camp-section').scrollIntoView({behavior:'smooth', block:'start'}); break; }
+      }
+    }, 100);
   } else {
     btn.disabled = false; btn.textContent = 'Save Assignment';
     alert('Error saving assignment.');
