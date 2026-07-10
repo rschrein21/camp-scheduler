@@ -721,8 +721,8 @@ function renderPool() {
     Object.values(poolMap[camp]).forEach(s => { _poolDays[camp][s.staff_id] = s.days; });
   });
 
-  const campOrder = CAMP_ORDER.filter(c => poolMap[c])
-    .concat(Object.keys(poolMap).filter(c => !CAMP_ORDER.includes(c)));
+  const campOrder = CAMP_ORDER.filter(c => poolMap[c] && !isWeekCompleted(c.split('\u00b7')[0].trim()))
+    .concat(Object.keys(poolMap).filter(c => !CAMP_ORDER.includes(c) && !isWeekCompleted(c.split('\u00b7')[0].trim())));
 
   // Pre-compute camp count per week
   const poolWeekCampCount = {};
@@ -1174,7 +1174,7 @@ function renderDailySummary() {
     'Aug 10\u201314 \u00b7 Issaquah',
     'Aug 17\u201321 \u00b7 West Seattle Del Ridge',
     'Aug 17\u201321 \u00b7 Bellevue',
-  ];
+  ].filter(c => !isWeekCompleted(c.split('\u00b7')[0].trim()));
 
   // Build per-camp, per-day, per-staff unique map (confirmed only)
   // key: camp → day → staff_id → {shift, name}

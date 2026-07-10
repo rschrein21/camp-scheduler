@@ -6,6 +6,7 @@ for every 2026 class, calculates 1-per-10 AM/PM staff needs, and writes
 enrollment.json used by the admin panel.
 """
 import requests, json, math, re, time, warnings, sys, os
+from datetime import date, timedelta
 from bs4 import BeautifulSoup
 warnings.filterwarnings('ignore')
 
@@ -187,6 +188,13 @@ def build_camp_needs(class_map, sess):
         if not loc:
             continue
         dk = date_key(cls['className'])
+        # Skip classes for camp weeks that have already ended
+        if dk != '00/00':
+            m, d = int(dk.split('/')[0]), int(dk.split('/')[1])
+            camp_end = date(2026, m, d) + timedelta(days=4)
+            if camp_end < date.today():
+                print(f'  ⏭ Skipping completed week: {cls["className"]}')
+                continue
         counts = fetch_fee_counts(sess, cls['campId'], cls['classId'])
         grouped[(loc, dk)]['full'] += counts.get('Full Day', 0)
         grouped[(loc, dk)]['half'] += counts.get('Half Day', 0)
