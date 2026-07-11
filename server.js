@@ -1253,6 +1253,20 @@ async function maybeAutoConfirm(staff_id, camp) {
   } catch (e) { console.error('maybeAutoConfirm error:', e); }
 }
 
+// POST /api/admin/move-request-camp — reassign specific request rows to a new camp
+app.post('/api/admin/move-request-camp', requireAdmin, async (req, res) => {
+  try {
+    const { req_ids, new_camp } = req.body;
+    if (!req_ids || !Array.isArray(req_ids) || !new_camp) {
+      return res.status(400).json({ error: 'req_ids (array) and new_camp required' });
+    }
+    for (const id of req_ids) {
+      await query('UPDATE requests SET camp = $1 WHERE id = $2', [new_camp, id]);
+    }
+    res.json({ ok: true, moved: req_ids.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/admin/status', requireAdmin, async (req, res) => {
   try {
     const { staff_id, camp, status, confirmed_shift, req_id, notify } = req.body;
