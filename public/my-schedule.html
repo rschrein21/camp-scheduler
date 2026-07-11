@@ -114,10 +114,10 @@
 
   <!-- Lookup card -->
   <div class="card" id="lookupCard">
-    <p class="lookup-desc">Enter your phone number to view your assigned shifts and update your availability.</p>
+    <p class="lookup-desc"><strong>Enter your phone number</strong> (the one you used to sign up) to view your assigned shifts.</p>
     <div class="lookup-row">
-      <input type="tel" id="phoneInput" placeholder="e.g. 206-555-1234" onkeydown="if(event.key==='Enter')loadSchedule()">
-      <button class="lookup-btn" onclick="loadSchedule()">Load</button>
+      <input type="tel" id="phoneInput" placeholder="📱 Phone number (e.g. 206-555-1234)" autocomplete="tel" onkeydown="if(event.key==='Enter')loadSchedule()" style="font-size:1rem">
+      <button class="lookup-btn" onclick="loadSchedule()">Look up</button>
     </div>
     <div class="lookup-err" id="lookupErr">No record found for that number.
       <a href="/" style="color:#0066cc;margin-left:4px">Submit availability →</a>
