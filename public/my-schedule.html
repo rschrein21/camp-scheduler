@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>My Summer Schedule — Nike Soccer Camp</title>
+<title>My Schedule — Nike Soccer Camp</title>
 <meta name="description" content="View and update your Nike Soccer Camp summer schedule">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -11,6 +11,8 @@
   header { background: #111; color: #fff; padding: 18px 24px; }
   header h1 { font-size: 1.2rem; font-weight: 700; }
   header p { font-size: 0.85rem; opacity: 0.55; margin-top: 3px; }
+  .assigned-summary { background: #e8f5e9; border: 1px solid #a3e6c0; border-radius: 8px; padding: 12px 16px; margin-bottom: 14px; font-size: 0.85rem; color: #1a5c36; display: none; }
+  .assigned-summary strong { display: block; font-size: 0.95rem; margin-bottom: 6px; }
   .container { max-width: 700px; margin: 24px auto; padding: 0 14px 100px; }
 
   .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
@@ -53,12 +55,12 @@
   .day-label { font-size: 0.7rem; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.04em; }
 
   /* Confirmed badge */
-  .conf-badge { width: 100%; text-align: center; font-size: 0.72rem; font-weight: 700;
+  .conf-badge { width: 100%; text-align: center; font-size: 0.75rem; font-weight: 800;
     padding: 5px 4px; border-radius: 6px; line-height: 1.2; }
   .conf-full { background: #dbeafe; color: #1d4ed8; }
   .conf-am   { background: #fef3c7; color: #92400e; }
   .conf-pm   { background: #ede9fe; color: #5b21b6; }
-  .conf-sub  { font-size: 0.6rem; font-weight: 400; opacity: 0.7; display: block; }
+  .conf-sub  { font-size: 0.62rem; font-weight: 600; opacity: 0.85; display: block; letter-spacing: 0.03em; }
 
   /* Shift selector */
   .shift-sel {
@@ -104,15 +106,15 @@
 <body>
 
 <header>
-  <h1>⚽ My Summer Schedule</h1>
-  <p>Nike Soccer Camp 2026 — View &amp; update your availability</p>
+  <h1>⚽ My Schedule</h1>
+  <p>Nike Soccer Camp 2026</p>
 </header>
 
 <div class="container">
 
   <!-- Lookup card -->
   <div class="card" id="lookupCard">
-    <p class="lookup-desc">Enter your phone number to view and update your full summer schedule.</p>
+    <p class="lookup-desc">Enter your phone number to view your assigned shifts and update your availability.</p>
     <div class="lookup-row">
       <input type="tel" id="phoneInput" placeholder="e.g. 206-555-1234" onkeydown="if(event.key==='Enter')loadSchedule()">
       <button class="lookup-btn" onclick="loadSchedule()">Load</button>
@@ -133,14 +135,14 @@
         <div>
           <label class="field-label">Shirt Size</label>
           <select id="nuShirt" class="field-input">
-            <option value="">—</option>
+            <option value="">-</option>
             <option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option>
           </select>
         </div>
         <div>
           <label class="field-label">Shorts Size</label>
           <select id="nuShorts" class="field-input">
-            <option value="">—</option>
+            <option value="">-</option>
             <option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option>
           </select>
         </div>
@@ -154,8 +156,8 @@
           <label class="field-label">Age Group Preference</label>
           <select id="nuRole" class="field-input">
             <option value="Both">Both (any age)</option>
-            <option value="5-8">5–8</option>
-            <option value="9-12">9–12</option>
+            <option value="5-8">5-8</option>
+            <option value="9-12">9-12</option>
           </select>
         </div>
       </div>
@@ -174,12 +176,18 @@
   <div id="scheduleSection" style="display:none">
 
     <!-- Confirm banner (shown when staff have confirmed shifts) -->
+    <!-- Assigned shifts summary (shown when staff have confirmed shifts) -->
+    <div class="assigned-summary" id="assignedSummary">
+      <strong>📋 Your Assigned Shifts</strong>
+      <div id="assignedSummaryText"></div>
+    </div>
+
     <div id="confirmBanner" style="display:none;background:#f0fff5;border:1px solid #a3e6c0;border-radius:10px;padding:14px 18px;margin-bottom:12px;align-items:center;justify-content:space-between;gap:12px">
-      <div style="font-size:0.85rem;color:#1a5c36">✅ You've been assigned. Tap to confirm you're good to go.</div>
+      <div style="font-size:0.85rem;color:#1a5c36">✅ Coach Rich has assigned your shifts (shown below in green). Tap to confirm you're good to go.</div>
       <button onclick="confirmSchedule()" style="background:#1a7a3a;color:#fff;border:none;padding:9px 16px;border-radius:6px;font-size:0.85rem;font-weight:700;cursor:pointer;white-space:nowrap;margin-top:8px">Confirm</button>
     </div>
     <div id="confirmedBanner" style="display:none;background:#f0fff5;border:1px solid #a3e6c0;border-radius:10px;padding:14px 18px;margin-bottom:12px">
-      <span style="font-size:0.85rem;color:#1a5c36">✅ <strong>Schedule confirmed!</strong> We’ll reach out if anything changes.</span>
+      <span style="font-size:0.85rem;color:#1a5c36">✅ <strong>Schedule confirmed!</strong> Your assigned shifts are locked below. Text Coach Rich if anything needs to change.</span>
     </div>
 
     <div class="card">
@@ -251,7 +259,7 @@ async function loadSchedule() {
   const res = await fetch('/api/staff/lookup?phone=' + encodeURIComponent(phone));
   if (!res.ok) {
     if (res.status === 404) {
-      // New user — show profile + availability form
+      // New user - show profile + availability form
       document.getElementById('lookupCard').style.display = 'none';
       document.getElementById('newUserSection').style.display = '';
       renderNewUserCamps();
@@ -301,10 +309,28 @@ async function loadSchedule() {
   // Show Assigned vs Confirmed status
   const hasStaffConfirmed = !!staff.schedule_confirmed_at;
   document.getElementById('staffStatus').textContent = hasConfirmed
-    ? (hasStaffConfirmed ? 'Confirmed' : 'Assigned')
+    ? (hasStaffConfirmed ? 'Confirmed ✅' : 'Assigned — please confirm below')
     : '';
   document.getElementById('staffStatus').style.color = hasStaffConfirmed ? '#1a7a3a' : '#0066cc';
   document.getElementById('cancelNote').style.display = hasConfirmed ? 'block' : 'none';
+
+  // Build assigned shifts summary
+  const summaryEl = document.getElementById('assignedSummary');
+  const summaryTextEl = document.getElementById('assignedSummaryText');
+  if (hasConfirmed) {
+    const lines = [];
+    Object.entries(campState).forEach(([camp, days]) => {
+      const assignedDays = Object.entries(days)
+        .filter(([, d]) => d.status === 'confirmed')
+        .sort((a, b) => ['Mon','Tue','Wed','Thu','Fri'].indexOf(a[0]) - ['Mon','Tue','Wed','Thu','Fri'].indexOf(b[0]))
+        .map(([day, d]) => `${day} (${(d.shift||'').toUpperCase() === 'FULL' ? 'Full Day' : (d.shift||'').toUpperCase()})`);
+      if (assignedDays.length) lines.push(`<strong style="font-weight:600">${camp}:</strong> ${assignedDays.join(', ')}`);
+    });
+    summaryTextEl.innerHTML = lines.join('<br>');
+    summaryEl.style.display = 'block';
+  } else {
+    summaryEl.style.display = 'none';
+  }
   renderCamps();
 }
 
@@ -352,14 +378,14 @@ function renderCamps() {
         const shift = s.shift;
         const cls = shift === 'full' ? 'conf-full' : shift === 'am' ? 'conf-am' : 'conf-pm';
         const label = shift === 'full' ? 'Full' : shift.toUpperCase();
-        html += `<div class="conf-badge ${cls}">${label}<span class="conf-sub">Assigned</span></div>`;
+        html += `<div class="conf-badge ${cls}">${label}<span class="conf-sub">🔒 Assigned</span></div>`;
       } else {
-        // Don't pre-fill if the row was declined — treat as blank so staff re-enter intentionally
+        // Don't pre-fill if the row was declined - treat as blank so staff re-enter intentionally
         const val = (s && s.status !== 'declined') ? s.shift : '';
         const selId = `s_${slug(camp)}_${d}`;
         const selCls = val === 'am' ? ' sel-am' : val === 'pm' ? ' sel-pm' : val === 'full' ? ' sel-full' : '';
         html += `<select id="${selId}" class="shift-sel${selCls}" onchange="onShiftChange(this)">
-          <option value="">—</option>
+          <option value="">-</option>
           <option value="am"  ${val==='am'  ?'selected':''}>AM</option>
           <option value="pm"  ${val==='pm'  ?'selected':''}>PM</option>
           <option value="full"${val==='full'?'selected':''}>Full</option>
@@ -415,7 +441,7 @@ function renderNewUserCamps() {
       const selId = `nu_${slug(camp)}_${d}`;
       html += `<div class="day-col"><div class="day-label">${d}</div>
         <select id="${selId}" class="shift-sel" onchange="onShiftChange(this)">
-          <option value="">—</option>
+          <option value="">-</option>
           <option value="am">AM</option>
           <option value="pm">PM</option>
           <option value="full">Full</option>
@@ -449,7 +475,7 @@ async function submitNewUser() {
   });
 
   btn.disabled = true;
-  btn.textContent = 'Submitting…';
+  btn.textContent = 'Submitting...';
 
   const res = await fetch('/api/submit', {
     method: 'POST',
@@ -485,7 +511,7 @@ async function saveSchedule() {
   saveOk.style.display = 'none';
   saveErr.style.display = 'none';
   saveBtn.disabled = true;
-  saveBtn.textContent = 'Saving…';
+  saveBtn.textContent = 'Saving...';
 
   // Collect all non-confirmed selections (only from rendered camps)
   const shifts = [];
@@ -575,14 +601,14 @@ function renderDirectorCamps(assignments, availability) {
         <label style="font-size:0.78rem;color:#666;font-weight:600;display:block;margin-bottom:5px">My Availability:</label>`;
 
     if (assigned) {
-      html += `<div style="font-size:0.8rem;color:#888;font-style:italic">Assigned — contact Rich to change.</div>`;
+      html += `<div style="font-size:0.8rem;color:#888;font-style:italic">Assigned - contact Rich to change.</div>`;
     } else {
       const val = avail || '';
       html += `<select id="${selId}" class="shift-sel" style="max-width:200px" onchange="onShiftChange(this)">
         <option value="">Not available</option>
-        <option value="skills" ${val==='skills'?'selected':''}>Available — Skills Director</option>
-        <option value="admin"  ${val==='admin' ?'selected':''}>Available — Admin Director</option>
-        <option value="either" ${val==='either'?'selected':''}>Available — Either Role</option>
+        <option value="skills" ${val==='skills'?'selected':''}>Available - Skills Director</option>
+        <option value="admin"  ${val==='admin' ?'selected':''}>Available - Admin Director</option>
+        <option value="either" ${val==='either'?'selected':''}>Available - Either Role</option>
       </select>`;
     }
 
@@ -602,7 +628,7 @@ async function saveDirectorSchedule() {
   saveOk.style.display = 'none';
   saveErr.style.display = 'none';
   saveBtn.disabled = true;
-  saveBtn.textContent = 'Saving…';
+  saveBtn.textContent = 'Saving...';
 
   const camps = [];
   CAMP_ORDER.forEach(camp => {
