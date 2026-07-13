@@ -323,7 +323,7 @@ async function loadSchedule() {
       const assignedDays = Object.entries(days)
         .filter(([, d]) => d.status === 'confirmed')
         .sort((a, b) => ['Mon','Tue','Wed','Thu','Fri'].indexOf(a[0]) - ['Mon','Tue','Wed','Thu','Fri'].indexOf(b[0]))
-        .map(([day, d]) => `${day} (${(d.shift||'').toUpperCase() === 'FULL' ? 'Full Day' : (d.shift||'').toUpperCase()})`);
+        .map(([day, d]) => { const s = (d.shift||'').toLowerCase(); const lbl = s === 'full' ? 'Full Day 8:20am–3:20pm' : s === 'am' ? 'AM 8am–12pm' : s === 'pm' ? 'PM 12pm–4pm' : s.toUpperCase(); return `${day} (${lbl})`; });
       if (assignedDays.length) lines.push(`<strong style="font-weight:600">${camp}:</strong> ${assignedDays.join(', ')}`);
     });
     summaryTextEl.innerHTML = lines.join('<br>');
@@ -377,8 +377,9 @@ function renderCamps() {
       if (isConfirmed) {
         const shift = s.shift;
         const cls = shift === 'full' ? 'conf-full' : shift === 'am' ? 'conf-am' : 'conf-pm';
-        const label = shift === 'full' ? 'Full' : shift.toUpperCase();
-        html += `<div class="conf-badge ${cls}">${label}<span class="conf-sub">🔒 Assigned</span></div>`;
+        const label = shift === 'full' ? 'Full Day' : shift.toUpperCase();
+        const timeLabel = shift === 'full' ? '8:20am–3:20pm' : shift === 'am' ? '8am–12pm' : '12pm–4pm';
+        html += `<div class="conf-badge ${cls}">${label}<span class="conf-sub">${timeLabel}</span><span class="conf-sub">🔒 Assigned</span></div>`;
       } else {
         // Don't pre-fill if the row was declined - treat as blank so staff re-enter intentionally
         const val = (s && s.status !== 'declined') ? s.shift : '';
@@ -386,9 +387,9 @@ function renderCamps() {
         const selCls = val === 'am' ? ' sel-am' : val === 'pm' ? ' sel-pm' : val === 'full' ? ' sel-full' : '';
         html += `<select id="${selId}" class="shift-sel${selCls}" onchange="onShiftChange(this)">
           <option value="">-</option>
-          <option value="am"  ${val==='am'  ?'selected':''}>AM</option>
-          <option value="pm"  ${val==='pm'  ?'selected':''}>PM</option>
-          <option value="full"${val==='full'?'selected':''}>Full</option>
+          <option value="am"  ${val==='am'  ?'selected':''}>AM (8–12)</option>
+          <option value="pm"  ${val==='pm'  ?'selected':''}>PM (12–4)</option>
+          <option value="full"${val==='full'?'selected':''}>Full (8:20–3:20)</option>
         </select>`;
       }
 
@@ -442,9 +443,9 @@ function renderNewUserCamps() {
       html += `<div class="day-col"><div class="day-label">${d}</div>
         <select id="${selId}" class="shift-sel" onchange="onShiftChange(this)">
           <option value="">-</option>
-          <option value="am">AM</option>
-          <option value="pm">PM</option>
-          <option value="full">Full</option>
+          <option value="am">AM (8–12)</option>
+          <option value="pm">PM (12–4)</option>
+          <option value="full">Full (8:20–3:20)</option>
         </select></div>`;
     });
     html += `</div></div>`;
