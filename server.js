@@ -787,12 +787,13 @@ app.post('/api/admin/cancel-shift-admin', requireAdmin, async (req, res) => {
     }
     // Return sub candidates (sub_list = TRUE for this camp, excluding cancelled staff)
     const subs = await query(`
-      SELECT DISTINCT ON (s.id) s.id as staff_id, s.name, s.phone, COALESCE(sr.rating, 3) as rating
+      SELECT DISTINCT ON (s.id) s.id as staff_id, s.name, s.phone,
+        COALESCE((SELECT ROUND(AVG(wr.rating)::numeric, 1) FROM weekly_ratings wr WHERE wr.staff_id = s.id), COALESCE(sr.rating, 3)) as rating
       FROM requests r
       JOIN staff s ON r.staff_id = s.id
       LEFT JOIN staff_ratings sr ON s.id = sr.staff_id
       WHERE r.camp = $1 AND r.sub_list = TRUE AND r.staff_id != $2
-      ORDER BY s.id, sr.rating DESC
+      ORDER BY s.id, COALESCE((SELECT ROUND(AVG(wr.rating)::numeric, 1) FROM weekly_ratings wr WHERE wr.staff_id = s.id), COALESCE(sr.rating, 3)) DESC
     `, [camp, rows[0].staff_id]);
     res.json({ ok: true, camp, day, shift: confirmed_shift || shift, sub_candidates: subs });
   } catch (err) {
@@ -1185,8 +1186,10 @@ app.get('/api/admin/submissions', requireAdmin, async (req, res) => {
     const staffList = await query('SELECT * FROM staff ORDER BY submitted_at DESC');
     const result = await Promise.all(staffList.map(async s => {
       const requests = await query('SELECT * FROM requests WHERE staff_id = $1 ORDER BY camp, day', [s.id]);
-      const ratingRows = await query('SELECT * FROM staff_ratings WHERE staff_id = $1', [s.id]);
-      const rating = ratingRows[0] || { rating: 3, notes: '' };
+      const avgRows = await query('SELECT ROUND(AVG(rating)::numeric, 1) as avg_rating FROM weekly_ratings WHERE staff_id = $1', [s.id]);
+      const staffRatingRows = await query('SELECT * FROM staff_ratings WHERE staff_id = $1', [s.id]);
+      const avgRating = avgRows[0]?.avg_rating ? parseFloat(avgRows[0].avg_rating) : null;
+      const rating = { rating: avgRating ?? (staffRatingRows[0]?.rating ?? 3), notes: staffRatingRows[0]?.notes ?? '' };
       const weeks = new Set(requests.map(r => r.camp));
       const fullDays = requests.filter(r => r.shift === 'full').length;
       const halfDays = requests.filter(r => r.shift !== 'full').length;
@@ -1204,7 +1207,7 @@ app.get('/api/admin/camps', requireAdmin, async (req, res) => {
              r.sub_list, r.cancel_requested, r.cancel_reason,
              s.name, s.email, s.phone, s.preferred_role, s.id as staff_id,
              s.bg_check_done, s.schedule_confirmed_at, s.schedule_updated_at,
-             COALESCE(sr.rating, 3) as rating
+             COALESCE((SELECT ROUND(AVG(wr.rating)::numeric, 1) FROM weekly_ratings wr WHERE wr.staff_id = s.id), COALESCE(sr.rating, 3)) as rating
       FROM requests r
       JOIN staff s ON r.staff_id = s.id
       LEFT JOIN staff_ratings sr ON s.id = sr.staff_id
@@ -2240,12 +2243,12 @@ app.get('/api/admin/open-shifts', requireAdmin, async (req, res) => {
     for (const c of cancelled) {
       const subs = await query(`
         SELECT DISTINCT ON (s.id) s.id as staff_id, s.name, s.phone, s.email,
-               COALESCE(sr.rating, 3) as rating
+               COALESCE((SELECT ROUND(AVG(wr.rating)::numeric, 1) FROM weekly_ratings wr WHERE wr.staff_id = s.id), COALESCE(sr.rating, 3)) as rating
         FROM requests r
         JOIN staff s ON r.staff_id = s.id
         LEFT JOIN staff_ratings sr ON s.id = sr.staff_id
         WHERE r.camp = $1 AND r.status = 'declined' AND r.staff_id != $2
-        ORDER BY s.id, sr.rating DESC
+        ORDER BY s.id, COALESCE((SELECT ROUND(AVG(wr.rating)::numeric, 1) FROM weekly_ratings wr WHERE wr.staff_id = s.id), COALESCE(sr.rating, 3)) DESC
       `, [c.camp, c.staff_id]);
       result.push({ ...c, sub_candidates: IS_PG ? subs : subs });
     }
