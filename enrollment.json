@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-14T10:00:44Z",
+  "updated": "2026-07-15T10:00:44Z",
   "camps": {
     "Aug 10\u201314 \u00b7 Lower Woodland": {
       "am": 7,
@@ -20,7 +20,7 @@
       "fullDay": 48,
       "halfDay": 18,
       "total": 66,
-      "earlyCare": 3,
+      "earlyCare": 4,
       "lateCare": 4
     },
     "July 20\u201324 \u00b7 Seattle University": {
@@ -48,11 +48,11 @@
     "July 20\u201324 \u00b7 Bothell": {
       "am": 7,
       "pm": 5,
-      "amCampers": 61,
+      "amCampers": 62,
       "pmCampers": 45,
       "fullDay": 45,
-      "halfDay": 16,
-      "total": 61,
+      "halfDay": 17,
+      "total": 62,
       "earlyCare": 2,
       "lateCare": 3
     },
@@ -81,22 +81,22 @@
     "Aug 3\u20137 \u00b7 Bellevue": {
       "am": 3,
       "pm": 2,
-      "amCampers": 23,
+      "amCampers": 24,
       "pmCampers": 14,
       "fullDay": 14,
-      "halfDay": 9,
-      "total": 23,
-      "earlyCare": 4,
+      "halfDay": 10,
+      "total": 24,
+      "earlyCare": 5,
       "lateCare": 1
     },
     "Aug 17\u201321 \u00b7 Bellevue": {
       "am": 3,
-      "pm": 2,
-      "amCampers": 26,
-      "pmCampers": 19,
-      "fullDay": 19,
+      "pm": 3,
+      "amCampers": 28,
+      "pmCampers": 21,
+      "fullDay": 21,
       "halfDay": 7,
-      "total": 26,
+      "total": 28,
       "earlyCare": 2,
       "lateCare": 2
     },
