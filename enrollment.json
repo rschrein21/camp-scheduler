@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-17T10:00:52Z",
+  "updated": "2026-07-18T10:00:43Z",
   "camps": {
     "Aug 10\u201314 \u00b7 Lower Woodland": {
       "am": 7,
@@ -12,25 +12,14 @@
       "earlyCare": 9,
       "lateCare": 14
     },
-    "July 13\u201317 \u00b7 Seattle University": {
-      "am": 7,
-      "pm": 5,
-      "amCampers": 66,
-      "pmCampers": 48,
-      "fullDay": 48,
-      "halfDay": 18,
-      "total": 66,
-      "earlyCare": 3,
-      "lateCare": 4
-    },
     "July 20\u201324 \u00b7 Seattle University": {
       "am": 7,
       "pm": 6,
-      "amCampers": 63,
-      "pmCampers": 52,
-      "fullDay": 52,
-      "halfDay": 11,
-      "total": 63,
+      "amCampers": 66,
+      "pmCampers": 54,
+      "fullDay": 54,
+      "halfDay": 12,
+      "total": 66,
       "earlyCare": 6,
       "lateCare": 10
     },
@@ -56,17 +45,6 @@
       "earlyCare": 2,
       "lateCare": 3
     },
-    "July 13\u201317 \u00b7 Issaquah": {
-      "am": 6,
-      "pm": 5,
-      "amCampers": 53,
-      "pmCampers": 44,
-      "fullDay": 44,
-      "halfDay": 9,
-      "total": 53,
-      "earlyCare": 1,
-      "lateCare": 4
-    },
     "Aug 10\u201314 \u00b7 Issaquah": {
       "am": 3,
       "pm": 2,
@@ -81,11 +59,11 @@
     "Aug 3\u20137 \u00b7 Bellevue": {
       "am": 3,
       "pm": 2,
-      "amCampers": 24,
-      "pmCampers": 14,
-      "fullDay": 14,
+      "amCampers": 25,
+      "pmCampers": 15,
+      "fullDay": 15,
       "halfDay": 10,
-      "total": 24,
+      "total": 25,
       "earlyCare": 5,
       "lateCare": 1
     },
@@ -100,36 +78,25 @@
       "earlyCare": 2,
       "lateCare": 2
     },
-    "July 13\u201317 \u00b7 West Seattle Hiawatha": {
-      "am": 10,
-      "pm": 9,
-      "amCampers": 99,
-      "pmCampers": 87,
-      "fullDay": 87,
-      "halfDay": 12,
-      "total": 99,
-      "earlyCare": 12,
-      "lateCare": 15
-    },
     "Aug 17\u201321 \u00b7 West Seattle Del Ridge": {
-      "am": 10,
+      "am": 11,
       "pm": 8,
-      "amCampers": 100,
-      "pmCampers": 77,
-      "fullDay": 77,
+      "amCampers": 101,
+      "pmCampers": 78,
+      "fullDay": 78,
       "halfDay": 23,
-      "total": 100,
+      "total": 101,
       "earlyCare": 21,
-      "lateCare": 15
+      "lateCare": 16
     },
     "July 20\u201324 \u00b7 West Seattle Del Ridge": {
       "am": 3,
       "pm": 3,
-      "amCampers": 27,
-      "pmCampers": 21,
-      "fullDay": 21,
+      "amCampers": 28,
+      "pmCampers": 22,
+      "fullDay": 22,
       "halfDay": 6,
-      "total": 27,
+      "total": 28,
       "earlyCare": 3,
       "lateCare": 1
     }
