@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-19T10:00:41Z",
+  "updated": "2026-07-20T10:00:41Z",
   "camps": {
     "Aug 10\u201314 \u00b7 Lower Woodland": {
       "am": 7,
@@ -15,11 +15,11 @@
     "July 20\u201324 \u00b7 Seattle University": {
       "am": 7,
       "pm": 6,
-      "amCampers": 67,
-      "pmCampers": 55,
-      "fullDay": 55,
+      "amCampers": 68,
+      "pmCampers": 56,
+      "fullDay": 56,
       "halfDay": 12,
-      "total": 67,
+      "total": 68,
       "earlyCare": 6,
       "lateCare": 10
     },
@@ -37,11 +37,11 @@
     "July 20\u201324 \u00b7 Bothell": {
       "am": 7,
       "pm": 5,
-      "amCampers": 65,
-      "pmCampers": 47,
-      "fullDay": 47,
+      "amCampers": 68,
+      "pmCampers": 50,
+      "fullDay": 50,
       "halfDay": 18,
-      "total": 65,
+      "total": 68,
       "earlyCare": 2,
       "lateCare": 3
     },
@@ -90,13 +90,13 @@
       "lateCare": 16
     },
     "July 20\u201324 \u00b7 West Seattle Del Ridge": {
-      "am": 3,
+      "am": 4,
       "pm": 3,
-      "amCampers": 29,
+      "amCampers": 34,
       "pmCampers": 22,
       "fullDay": 22,
-      "halfDay": 7,
-      "total": 29,
+      "halfDay": 12,
+      "total": 34,
       "earlyCare": 3,
       "lateCare": 1
     }
