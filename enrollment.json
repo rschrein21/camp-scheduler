@@ -1,25 +1,25 @@
 {
-  "updated": "2026-07-22T10:00:44Z",
+  "updated": "2026-07-23T10:00:41Z",
   "camps": {
     "Aug 10\u201314 \u00b7 Lower Woodland": {
-      "am": 7,
+      "am": 8,
       "pm": 7,
-      "amCampers": 69,
-      "pmCampers": 64,
-      "fullDay": 64,
+      "amCampers": 71,
+      "pmCampers": 66,
+      "fullDay": 66,
       "halfDay": 5,
-      "total": 69,
+      "total": 71,
       "earlyCare": 9,
       "lateCare": 14
     },
     "July 20\u201324 \u00b7 Seattle University": {
       "am": 7,
       "pm": 6,
-      "amCampers": 69,
-      "pmCampers": 59,
-      "fullDay": 59,
+      "amCampers": 68,
+      "pmCampers": 58,
+      "fullDay": 58,
       "halfDay": 10,
-      "total": 69,
+      "total": 68,
       "earlyCare": 6,
       "lateCare": 10
     },
