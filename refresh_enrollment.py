@@ -162,7 +162,7 @@ def fetch_fee_counts(sess, camp_id, class_id):
                     counts[fee] = counts.get(fee, 0) + 1
             if care_col is not None and len(cells) > care_col:
                 val = cells[care_col].get_text(strip=True).lower()
-                if 'morning and afternoon' in val:
+                if 'both' in val:
                     care['yes_both'] += 1
                 elif 'morning' in val:
                     care['yes_morning'] += 1
