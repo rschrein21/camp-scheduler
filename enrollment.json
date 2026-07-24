@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-23T10:00:41Z",
+  "updated": "2026-07-24T10:00:44Z",
   "camps": {
     "Aug 10\u201314 \u00b7 Lower Woodland": {
       "am": 8,
@@ -69,23 +69,23 @@
     },
     "Aug 17\u201321 \u00b7 Bellevue": {
       "am": 3,
-      "pm": 2,
-      "amCampers": 27,
-      "pmCampers": 20,
-      "fullDay": 20,
+      "pm": 3,
+      "amCampers": 28,
+      "pmCampers": 21,
+      "fullDay": 21,
       "halfDay": 7,
-      "total": 27,
+      "total": 28,
       "earlyCare": 2,
       "lateCare": 2
     },
     "Aug 17\u201321 \u00b7 West Seattle Del Ridge": {
       "am": 11,
       "pm": 9,
-      "amCampers": 106,
+      "amCampers": 107,
       "pmCampers": 82,
       "fullDay": 82,
-      "halfDay": 24,
-      "total": 106,
+      "halfDay": 25,
+      "total": 107,
       "earlyCare": 25,
       "lateCare": 16
     },
