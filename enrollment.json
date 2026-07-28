@@ -1,24 +1,24 @@
 {
-  "updated": "2026-07-27T10:00:32Z",
+  "updated": "2026-07-28T10:00:35Z",
   "camps": {
     "Aug 10\u201314 \u00b7 Lower Woodland": {
       "am": 8,
       "pm": 7,
-      "amCampers": 71,
-      "pmCampers": 66,
-      "fullDay": 66,
+      "amCampers": 72,
+      "pmCampers": 67,
+      "fullDay": 67,
       "halfDay": 5,
-      "total": 71,
+      "total": 72,
       "earlyCare": 9,
       "lateCare": 22
     },
     "Aug 3\u20137 \u00b7 Washington Park": {
       "am": 10,
-      "pm": 6,
+      "pm": 7,
       "amCampers": 95,
-      "pmCampers": 59,
-      "fullDay": 59,
-      "halfDay": 36,
+      "pmCampers": 61,
+      "fullDay": 61,
+      "halfDay": 34,
       "total": 95,
       "earlyCare": 11,
       "lateCare": 14
@@ -26,11 +26,11 @@
     "Aug 10\u201314 \u00b7 Issaquah": {
       "am": 3,
       "pm": 2,
-      "amCampers": 26,
+      "amCampers": 27,
       "pmCampers": 18,
       "fullDay": 18,
-      "halfDay": 8,
-      "total": 26,
+      "halfDay": 9,
+      "total": 27,
       "earlyCare": 1,
       "lateCare": 4
     },
