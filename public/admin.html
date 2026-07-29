@@ -610,7 +610,7 @@ function renderSchedule() {
         html += `<tr>
           <td class="name-col"><strong>${s.name}</strong><br><span style="font-size:0.72rem;color:#aaa">${s.email}</span></td>
           <td><span class="role-badge">${s.preferred_role||'?'}</span></td>
-          <td><span class="rating-stars">${'★'.repeat(s.rating)}${'☆'.repeat(5-s.rating)}</span></td>
+          <td><span class="rating-stars">${'★'.repeat(Math.round(s.rating||0))}${'☆'.repeat(5-Math.round(s.rating||0))}</span></td>
           ${DAYS.map(d => {
             const day = s.days[d];
             if (!day) return `<td>${dayBadge(null,false,d)}</td>`;
@@ -796,7 +796,7 @@ function renderPool() {
           ${isWaitlisted ? '<br><span style="font-size:0.7rem;font-weight:700;color:#b35c00;">&#9203; Waitlisted</span>' : ''}
         </td>
         <td><span class="role-badge">${s.preferred_role||'?'}</span></td>
-        <td><span class="rating-stars">${'★'.repeat(s.rating)}${'☆'.repeat(5-s.rating)}</span></td>
+        <td><span class="rating-stars">${'★'.repeat(Math.round(s.rating||0))}${'☆'.repeat(5-Math.round(s.rating||0))}</span></td>
         ${DAYS.map(d => {
           const day = s.days[d];
           if (!day) return `<td>${dayBadge(null,false,d)}</td>`;
@@ -1057,7 +1057,7 @@ function renderCamps() {
             <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:${s.overallStatus==='confirmed'?'#1a7a3a':s.overallStatus==='declined'?'#cc0000':'#aaa'}">${s.overallStatus==='confirmed'?'Assigned':s.overallStatus==='declined'?'Declined':'Available:'}</span>
           </td>
           <td><span class="role-badge">${s.preferred_role || '?'}</span></td>
-          <td><span class="rating-stars">${'★'.repeat(s.rating)}${'☆'.repeat(5-s.rating)}</span></td>
+          <td><span class="rating-stars">${'★'.repeat(Math.round(s.rating||0))}${'☆'.repeat(5-Math.round(s.rating||0))}</span></td>
           ${DAYS.map(d => {
             const day = s.days[d];
             if (!day) return `<td>${dayBadge(null, false, d)}</td>`;
@@ -1377,7 +1377,7 @@ async function adminCancelShift(reqId) {
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0">
         <div>
           <strong style="font-size:0.88rem">${s.name}</strong>
-          <div style="font-size:0.73rem;color:#888">${'★'.repeat(s.rating)}${'\u2606'.repeat(5-s.rating)}</div>
+          <div style="font-size:0.73rem;color:#888">${'★'.repeat(Math.round(s.rating||0))}${'\u2606'.repeat(5-Math.round(s.rating||0))}</div>
         </div>
         <button id="offer-btn-${s.staff_id}" onclick="sendSubOffer(${s.staff_id},'${data.camp.replace(/'/g,"\\'")}',' ${data.day}','${data.shift}')" style="background:#111;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer">Send Offer</button>
       </div>
