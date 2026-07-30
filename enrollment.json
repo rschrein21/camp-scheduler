@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-29T10:00:34Z",
+  "updated": "2026-07-30T10:00:36Z",
   "camps": {
     "Aug 10\u201314 \u00b7 Lower Woodland": {
       "am": 8,
@@ -15,11 +15,11 @@
     "Aug 3\u20137 \u00b7 Washington Park": {
       "am": 10,
       "pm": 7,
-      "amCampers": 98,
-      "pmCampers": 62,
-      "fullDay": 62,
+      "amCampers": 100,
+      "pmCampers": 64,
+      "fullDay": 64,
       "halfDay": 36,
-      "total": 98,
+      "total": 100,
       "earlyCare": 11,
       "lateCare": 14
     },
@@ -48,11 +48,11 @@
     "Aug 17\u201321 \u00b7 Bellevue": {
       "am": 4,
       "pm": 3,
-      "amCampers": 33,
-      "pmCampers": 26,
-      "fullDay": 26,
+      "amCampers": 34,
+      "pmCampers": 27,
+      "fullDay": 27,
       "halfDay": 7,
-      "total": 33,
+      "total": 34,
       "earlyCare": 2,
       "lateCare": 4
     },
