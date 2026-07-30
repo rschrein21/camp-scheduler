@@ -1750,7 +1750,7 @@ function renderOpenShifts(openShifts) {
   }
 
   const shiftLabel = s => s === 'full' ? 'Full Day' : s === 'am' ? 'AM' : 'PM';
-  const stars = r => '★'.repeat(r) + '☆'.repeat(5 - r);
+  const stars = r => { const rv = Math.round(r||0); return '★'.repeat(rv) + '☆'.repeat(5-rv); };
 
   let html = '<div style="max-width:700px;margin:0 auto">';
 
