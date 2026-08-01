@@ -1595,7 +1595,7 @@ app.post('/api/admin/director-shift', requireAdmin, async (req, res) => {
   try {
     const { director_id, camp, day, shift } = req.body;
     if (!director_id || !camp || !day) return res.status(400).json({ error: 'director_id, camp, day required' });
-    if (!shift || shift === 'none') {
+    if (!shift || shift === 'none' || shift === 'clear') {
       // Remove override → reverts to full day
       await query('DELETE FROM director_daily_shifts WHERE director_id=$1 AND camp=$2 AND day=$3', [director_id, camp, day]);
     } else {

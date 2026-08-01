@@ -502,7 +502,7 @@ function renderSchedule() {
         if (sh === 'full') dayCount[d].full++;
         else if (sh === 'am') dayCount[d].am++;
         else if (sh === 'pm') dayCount[d].pm++;
-        // 'none' = director off that day, don't count
+        // 'off' = director off that day, don't count
       });
     });
 
@@ -565,7 +565,7 @@ function renderSchedule() {
                   : '<td></td>';
                 return `<tr><td style="width:50px;font-weight:700">${day}</td>
                   <td><select data-orig="${cur}" data-day="${day}" style="padding:3px 5px;border:1px solid #ddd;border-radius:4px;font-size:0.75rem" onchange="markPendingChange(this)">
-                    <option value="none">— None (off)</option>
+                    <option value="off" ${cur==='off'?'selected':''}>— None (off)</option>
                     <option value="am" ${cur==='am'?'selected':''}>AM</option>
                     <option value="pm" ${cur==='pm'?'selected':''}>PM</option>
                     <option value="full" ${cur==='full'?'selected':''}>Full Day</option>
