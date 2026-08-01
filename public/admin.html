@@ -348,6 +348,7 @@ function dayBadge(shift, cancelled, day) {
   if (!shift) return `<span class="day-badge db-none">—</span>`;
   if (shift === 'full') return `<span class="day-badge db-full">${shiftLabel('full', day)}</span>`;
   if (shift === 'am')   return `<span class="day-badge db-am">${shiftLabel('am', day)}</span>`;
+  if (shift === 'off')  return `<span class="day-badge db-none">Off</span>`;
   return `<span class="day-badge db-pm">${shiftLabel('pm', day)}</span>`;
 }
 
