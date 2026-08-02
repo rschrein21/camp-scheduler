@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-01T10:00:38Z",
+  "updated": "2026-08-02T10:00:38Z",
   "camps": {
     "Aug 10\u201314 \u00b7 Lower Woodland": {
       "am": 8,
@@ -26,11 +26,11 @@
     "Aug 10\u201314 \u00b7 Issaquah": {
       "am": 3,
       "pm": 2,
-      "amCampers": 27,
-      "pmCampers": 18,
-      "fullDay": 18,
+      "amCampers": 28,
+      "pmCampers": 19,
+      "fullDay": 19,
       "halfDay": 9,
-      "total": 27,
+      "total": 28,
       "earlyCare": 1,
       "lateCare": 4
     },
