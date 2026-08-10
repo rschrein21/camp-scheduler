@@ -1,49 +1,49 @@
 {
-  "updated": "2026-08-09T10:00:34Z",
+  "updated": "2026-08-10T10:00:31Z",
   "camps": {
     "Aug 10\u201314 \u00b7 Lower Woodland": {
       "am": 8,
       "pm": 8,
-      "amCampers": 79,
-      "pmCampers": 72,
-      "fullDay": 72,
+      "amCampers": 80,
+      "pmCampers": 73,
+      "fullDay": 73,
       "halfDay": 7,
-      "total": 79,
+      "total": 80,
       "earlyCare": 9,
-      "lateCare": 22
+      "lateCare": 23
     },
     "Aug 10\u201314 \u00b7 Issaquah": {
       "am": 4,
       "pm": 3,
-      "amCampers": 31,
-      "pmCampers": 21,
-      "fullDay": 21,
+      "amCampers": 32,
+      "pmCampers": 22,
+      "fullDay": 22,
       "halfDay": 10,
-      "total": 31,
+      "total": 32,
       "earlyCare": 1,
       "lateCare": 4
     },
     "Aug 17\u201321 \u00b7 Bellevue": {
       "am": 4,
-      "pm": 3,
-      "amCampers": 37,
-      "pmCampers": 30,
-      "fullDay": 30,
+      "pm": 4,
+      "amCampers": 39,
+      "pmCampers": 32,
+      "fullDay": 32,
       "halfDay": 7,
-      "total": 37,
+      "total": 39,
       "earlyCare": 4,
       "lateCare": 4
     },
     "Aug 17\u201321 \u00b7 West Seattle Del Ridge": {
       "am": 12,
       "pm": 9,
-      "amCampers": 112,
-      "pmCampers": 87,
-      "fullDay": 87,
+      "amCampers": 115,
+      "pmCampers": 90,
+      "fullDay": 90,
       "halfDay": 25,
-      "total": 112,
-      "earlyCare": 24,
-      "lateCare": 43
+      "total": 115,
+      "earlyCare": 27,
+      "lateCare": 46
     }
   }
 }
