@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-11T10:00:33Z",
+  "updated": "2026-08-12T10:00:35Z",
   "camps": {
     "Aug 10\u201314 \u00b7 Lower Woodland": {
       "am": 9,
@@ -24,13 +24,13 @@
       "lateCare": 4
     },
     "Aug 17\u201321 \u00b7 Bellevue": {
-      "am": 4,
+      "am": 5,
       "pm": 4,
-      "amCampers": 40,
-      "pmCampers": 33,
-      "fullDay": 33,
-      "halfDay": 7,
-      "total": 40,
+      "amCampers": 43,
+      "pmCampers": 34,
+      "fullDay": 34,
+      "halfDay": 9,
+      "total": 43,
       "earlyCare": 4,
       "lateCare": 4
     },
