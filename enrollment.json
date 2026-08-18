@@ -1,25 +1,25 @@
 {
-  "updated": "2026-08-16T10:00:28Z",
+  "updated": "2026-08-18T10:00:32Z",
   "camps": {
     "Aug 17\u201321 \u00b7 Bellevue": {
       "am": 6,
-      "pm": 4,
-      "amCampers": 51,
-      "pmCampers": 40,
-      "fullDay": 40,
-      "halfDay": 11,
-      "total": 51,
+      "pm": 5,
+      "amCampers": 54,
+      "pmCampers": 41,
+      "fullDay": 41,
+      "halfDay": 13,
+      "total": 54,
       "earlyCare": 3,
       "lateCare": 7
     },
     "Aug 17\u201321 \u00b7 West Seattle Del Ridge": {
       "am": 12,
-      "pm": 9,
-      "amCampers": 116,
-      "pmCampers": 90,
-      "fullDay": 90,
+      "pm": 10,
+      "amCampers": 117,
+      "pmCampers": 91,
+      "fullDay": 91,
       "halfDay": 26,
-      "total": 116,
+      "total": 117,
       "earlyCare": 27,
       "lateCare": 46
     }
