@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-20T10:00:33Z",
+  "updated": "2026-08-21T10:00:31Z",
   "camps": {
     "Aug 17\u201321 \u00b7 Bellevue": {
       "am": 6,
@@ -16,9 +16,9 @@
       "am": 12,
       "pm": 10,
       "amCampers": 117,
-      "pmCampers": 92,
-      "fullDay": 92,
-      "halfDay": 25,
+      "pmCampers": 93,
+      "fullDay": 93,
+      "halfDay": 24,
       "total": 117,
       "earlyCare": 27,
       "lateCare": 46
